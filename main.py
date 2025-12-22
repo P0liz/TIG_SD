@@ -25,6 +25,9 @@ def main(prompt, expected_label, max_steps=100):
         digit.correctly_classified = False
 
     if not digit.correctly_classified:
+        print(digit.predicted_label, digit.expected_label)
+        ind = Individual(digit, digit)
+        ind.export()
         raise RuntimeError("Initial latent does not satisfy the label")
     reference = digit   # reference digit for distance calculations from original
 
@@ -32,9 +35,8 @@ def main(prompt, expected_label, max_steps=100):
 
     # Iterative mutation process
     for step in range(1, max_steps + 1):
-        DigitMutator(digit).mutate(prompt, reference)
-        img = DigitMutator(digit).generate(prompt)
-        prediction, confidence = Predictor.predict_single(img)
+        DigitMutator(digit).mutate(prompt)
+        prediction, confidence = Predictor.predict_single(digit.image)
         
         digit.predicted_label = prediction
         digit.confidence = confidence

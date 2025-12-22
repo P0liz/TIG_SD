@@ -11,65 +11,138 @@ from diffusers.schedulers import DDIMScheduler
 # Extras
 #import keras_cv
 
+# Using Stable diffusion pipeline
+class SDPipelineManager:
+    """Singleton per gestire la pipeline Stable Diffusion"""
+    _instance = None
+    _pipe = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SDPipelineManager, cls).__new__(cls)
+        return cls._instance
+    
+    def initialize(self, num_inference_steps=15):
+        """Inizializza la pipeline solo la prima volta"""
+        if self._initialized:
+            print("✓ Using cached Stable Diffusion pipeline")
+            return self._pipe
+        
+        print("Loading Stable Diffusion pipeline...")
+        
+        # Determine dtype based on device
+        dtype = torch.float16 if DEVICE == "cuda:0" else torch.float32
+        variant = "fp16" if dtype == torch.float16 else None
+        
+        # Load pipeline
+        self._pipe = StableDiffusionPipeline.from_pretrained(
+            MODEL_ID_PATH, 
+            variant=variant,
+            dtype=dtype,     
+            safety_checker=None
+        ).to(DEVICE)
+        print("Loaded Stable Diffusion model")
+        
+        # Load LoRA weights
+        self._pipe.load_lora_weights(
+            "./SD_weights", 
+            weight_name="Mnist_Lora_sdv1.5-000005.safetensors"
+        )
+        print("Loaded LoRA weights")
+        
+        # Configure scheduler (only once)
+        self._pipe.scheduler = DDIMScheduler.from_config(
+            self._pipe.scheduler.config,
+            rescale_betas_zero_snr=True
+        )
+        print("Configured scheduler")
+        
+        # Enable optimizations if on CUDA
+        if DEVICE == "cuda:0":
+            self._pipe.enable_attention_slicing()
+            print("Enabled attention slicing")
+        
+        self.num_inference_steps = num_inference_steps
+        self._initialized = True
+        
+        print("Pipeline ready for inference")
+        return self._pipe
+
+        # Using diffusion library 
+        #cond_latent, image = diffusion.generate(prompt, mutate = mutate, mutated_latent = mutated_latent)
+        #return cond_latent, image 
+        
+        # Using KerasCV Stable Diffusion model
+        # NOT ENOUGH MEMORY
+        """
+        model = keras_cv.models.StableDiffusion(jit_compile=True)
+
+        image = model.generate_image(
+            prompt,
+            batch_size=1,
+            num_steps=10,       
+            diffusion_noise=mutated_latent,
+        )
+
+        return mutated_latent, image
+        """
+    
+    def get_pipe(self):
+        """Ottieni la pipeline (inizializza se necessario)"""
+        if not self._initialized:
+            self.initialize()
+        return self._pipe
+
+
+# Istanza globale singleton
+pipeline_manager = SDPipelineManager()
+
+
+def get_pipeline():
+    """Funzione helper per ottenere la pipeline"""
+    return pipeline_manager.get_pipe()
+    
+
 def mutate(z_orig, delta):
     """
-    z_orig: ndarray (latent)
-    delta: float (perturbation step) adjusted based on confidence
+    Muta il latent code aggiungendo rumore gaussiano
+    
+    Args:
+        z_orig: torch.Tensor - latent originale
+        delta: float - intensità della perturbazione
+    
+    Returns:
+        z_mut: torch.Tensor - latent mutato
     """
-    epsilon = np.random.randn(*z_orig.shape).astype(z_orig.dtype)  # ε ~ N(0, I) noise
+    epsilon = torch.randn_like(z_orig)  # ε ~ N(0, I) noise
     z_mut = z_orig + delta * epsilon
     return z_mut
 
 def generate(prompt, mutated_latent=None):
     """
-    prompt: str
-    mutated_latent: ndarray (latent)
+    Genera un'immagine usando Stable Diffusion
+    
+    Args:
+        prompt: str - prompt testuale
+        mutated_latent: torch.Tensor - latent code (opzionale)
+    
+    Returns:
+        mutated_latent: torch.Tensor - latent usato
+        image_tensor: torch.Tensor - immagine preprocessata [1, 1, 28, 28]
     """
-    # Using Stable diffusion pipeline
-    num_inference_steps = 15
-    
-    # Loading model
-    pipe = StableDiffusionPipeline.from_pretrained(
-        MODEL_ID_PATH, 
-        variant="fp16", 
-        torch_dtype=torch.float16,     # reduce memory usage
-        safety_checker=None).to(DEVICE)
-    print("Loaded Stable Diffusion model")
-    pipe.load_lora_weights(LORA_WEIGHTS_PATH)
-    print("Loaded LORA weights")
-    
-    # (Opzionale) Cambia scheduler per velocità
-    pipe.scheduler = DDIMScheduler.from_config(
-        pipe.scheduler.config,
-        rescale_betas_zero_snr=True
-    )
-    print("Loaded scheduler")
-    
-    
+    pipe = get_pipeline()
     with torch.inference_mode():
-        image = pipe(prompt=prompt, guidance_scale=3.5, num_inference_steps=num_inference_steps, latents=mutated_latent)["images"][0]
+        image = pipe(
+            prompt=prompt, 
+            guidance_scale=3.5, 
+            num_inference_steps=pipeline_manager.num_inference_steps, 
+            latents=mutated_latent)["images"][0]
         # preprocess image to 28x28 grayscale tensor
-        image_tensor = process_image(image).unsqueeze(0).to(DEVICE)  # Add batch dimension and move to device
+    image_tensor = process_image(image).unsqueeze(0).to(DEVICE)  # Add batch dimension and move to device
     return mutated_latent, image_tensor
     
-    # Using diffusion library 
-    #cond_latent, image = diffusion.generate(prompt, mutate = mutate, mutated_latent = mutated_latent)
-    #return cond_latent, image 
     
-    # Using KerasCV Stable Diffusion model
-    # NOT ENOUGH MEMORY
-    """
-    model = keras_cv.models.StableDiffusion(jit_compile=True)
-
-    image = model.generate_image(
-        prompt,
-        batch_size=1,
-        num_steps=10,        # Riduci da 50 a 10
-        diffusion_noise=mutated_latent,
-    )
-
-    return mutated_latent, image
-    """
 
 # TODO: capire come funziona e cosa succede ancora prima di passare l'immagine al classificatore
 def process_image(image):

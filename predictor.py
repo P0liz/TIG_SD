@@ -21,8 +21,8 @@ class Predictor:
     print("Loaded classifier")
     
     def predict_single(img):
-        tensor_image = img.unsqueeze(0).to(DEVICE)  
-        original_logit = Predictor.classifier(tensor_image).squeeze().detach().cpu().numpy()
+        #img_detached = img.detach()
+        original_logit = Predictor.classifier(img).squeeze().detach().cpu().numpy()
         original_label = np.argmax(original_logit).item()
         
         # TODO: not really a confidence score, just appling softmax to logits
