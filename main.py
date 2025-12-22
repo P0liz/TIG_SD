@@ -13,8 +13,8 @@ def main(prompt, expected_label, max_steps=50):
     digit = MnistMember(latent, expected_label)
 
     # Initial generation and validation
-    img = DigitMutator(digit).generate(prompt)
-    prediction, confidence = Predictor.predict_single(img.image, img.image)
+    DigitMutator(digit).generate(prompt)
+    prediction, confidence = Predictor.predict_single(digit.image, digit.image)
     
     # Initial assignment
     digit.predicted_label = prediction

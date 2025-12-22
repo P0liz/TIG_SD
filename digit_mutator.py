@@ -28,4 +28,3 @@ class DigitMutator:
     def generate(self, prompt):
         _, img = mutation_manager.generate(prompt, mutated_latent=self.digit.latent)
         self.digit.image = img
-        return img
