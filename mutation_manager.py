@@ -4,7 +4,7 @@ import cv2
 import torch
 
 from torchvision import transforms
-from config import DEVICE, MODEL_ID_PATH, LORA_WEIGHTS_PATH
+from config import DEVICE, MODEL_ID_PATH, LORA_PATH, LORA_WEIGHTS
 from diffusers import StableDiffusionPipeline
 from diffusers.schedulers import DDIMScheduler
 
@@ -45,10 +45,7 @@ class SDPipelineManager:
         print("Loaded Stable Diffusion model")
         
         # Load LoRA weights
-        self._pipe.load_lora_weights(
-            "./SD_weights", 
-            weight_name="Mnist_Lora_sdv1.5-000005.safetensors"
-        )
+        self._pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
         print("Loaded LoRA weights")
         
         # Configure scheduler (only once)

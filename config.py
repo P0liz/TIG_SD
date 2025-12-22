@@ -51,10 +51,13 @@ EXPLABEL = 5
 #TODO: set interpreter
 INTERPRETER = '/home/vin/yes/envs/tf_gpu/bin/python'
 
+
 # Classifier
 CLASSIFIER_WEIGHTS_PATH = './mnist_classifier/weight/MNIST_conv_classifier.pth'
 
 # Stable Diffusion 
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
-LORA_WEIGHTS_PATH = "./SD_weights/Mnist_Lora_sdv1.5.safetensors"
+LORA_PATH = "./SD_weights"
+LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
+DELTA = 0.05

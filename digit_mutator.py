@@ -1,5 +1,6 @@
 from math import exp
 import mutation_manager
+from config import DELTA
 
 class DigitMutator:
 
@@ -10,7 +11,7 @@ class DigitMutator:
     def mutate(self, prompt):
         # Intensità progressiva della mutazione
         # TODO: cambiare delta in base alla fitness 
-        base_delta = 0.01
+        base_delta = DELTA
         delta = base_delta * exp(-self.digit.confidence)
 
         # Mutazione nel latent space
