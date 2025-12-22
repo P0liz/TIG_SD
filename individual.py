@@ -45,7 +45,46 @@ class Individual:
                 'm1': str(self.m1.id),
                 'm2': str(self.m2.id)
         }
+    
+    def export(self):
+        # Base directory for individuals
+        makedirs(Folder.DST_IND, exist_ok=True)
 
+        # Individual directory
+        ind_dir = join(Folder.DST_IND, f"ind{self.id}")
+        makedirs(ind_dir, exist_ok=True)
+        # Save metadata
+        filedest = join(ind_dir, "data.json")
+        with open(filedest, "w") as f:
+            json.dump(self.to_dict(), f, sort_keys=True, indent=4)
+
+        # --- Helper to save a member ---
+        def save_member(member, idx):
+            base_name = f"archived_{idx}_mem{idx}_l_{member.predicted_label}"
+            png_path = join(ind_dir, base_name + ".png")
+            npy_path = join(ind_dir, base_name + ".npy")
+
+            img_np = member.image.detach().cpu().numpy().squeeze()
+
+            # Save image (visual)
+            plt.imsave(
+                png_path,
+                img_np,
+                cmap=cm.gray,
+                format="png"
+            )
+
+            # Save raw tensor (scientific)
+            np.save(npy_path, img_np)
+
+            # Consistency check
+            assert np.array_equal(img_np, np.load(npy_path))
+
+        # Save members
+        save_member(self.m1, idx=1)
+        save_member(self.m2, idx=2)
+
+    """
     def export(self):
         if not exists(Folder.DST_IND):
             makedirs(Folder.DST_IND)
@@ -76,6 +115,7 @@ class Individual:
         np.save(filename2, img_np)
         assert (np.array_equal(img_np,
                                np.load(filename2 + '.npy')))
+    """
 
     def evaluate(self, archive):
         self.sparseness = None

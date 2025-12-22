@@ -6,7 +6,7 @@ from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 
-def main(prompt, expected_label, max_steps=50):
+def main(prompt, expected_label, max_steps=2):
 
     # Starting from a random latent noise vector
     latent = torch.randn(1, 4, 64, 64, dtype=torch.float32)
@@ -14,7 +14,7 @@ def main(prompt, expected_label, max_steps=50):
 
     # Initial generation and validation
     DigitMutator(digit).generate(prompt)
-    prediction, confidence = Predictor.predict_single(digit.image, digit.image)
+    prediction, confidence = Predictor.predict_single(digit, digit)
     
     # Initial assignment
     digit.predicted_label = prediction
@@ -36,7 +36,7 @@ def main(prompt, expected_label, max_steps=50):
     # Iterative mutation process
     for step in range(1, max_steps + 1):
         DigitMutator(digit).mutate(prompt)
-        prediction, confidence = Predictor.predict_single(reference.image, digit.image)
+        prediction, confidence = Predictor.predict_single(reference, digit)
         
         digit.predicted_label = prediction
         digit.confidence = confidence
@@ -48,7 +48,7 @@ def main(prompt, expected_label, max_steps=50):
         print(
             f"[{step:03d}] "
             f"pred={digit.predicted_label} "
-            f"conf={digit.confidence:.3f}"
+            f"dist={digit.confidence:.3f}"
         )
 
         if not digit.correctly_classified:

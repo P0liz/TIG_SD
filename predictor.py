@@ -20,9 +20,9 @@ class Predictor:
     classifier.eval()
     print("Loaded classifier")
     
-    def predict_single(ref, img):
+    def predict_single(ref, dig):
         #img_detached = img.detach()
-        original_logit = Predictor.classifier(img).squeeze().detach().cpu().numpy()
+        original_logit = Predictor.classifier(dig.image).squeeze().detach().cpu().numpy()
         original_label = np.argmax(original_logit).item()
         
         # TODO: not really a confidence score, just appling softmax to logits
@@ -32,7 +32,7 @@ class Predictor:
 
         #confidence = Predictor.confidence_margin(torch.tensor(original_logit))
 
-        confidence = -torch.cosine_similarity(ref, img)
+        confidence = torch.norm(dig.latent - ref.latent).item()
         return original_label, confidence
 
     def confidence_margin(logits):
