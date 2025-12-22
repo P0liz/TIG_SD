@@ -27,9 +27,15 @@ class Predictor:
         
         # TODO: not really a confidence score, just appling softmax to logits
         # but this does not account for cases when all logits are similar (model is unsure)
-        probs = F.softmax(torch.tensor(original_logit), dim=0)
-        confidence = probs[original_label].item()
+        #probs = F.softmax(torch.tensor(original_logit), dim=0)
+        #confidence = probs[original_label].item()
+        confidence = Predictor.confidence_margin(torch.tensor(original_logit))
         return original_label, confidence
+
+    def confidence_margin(logits):
+        sorted_logits, _ = torch.sort(logits, descending=True)
+        margin = sorted_logits[0] - sorted_logits[1]
+        return margin.item()
 
     """ TODO: understand if needed
     @staticmethod

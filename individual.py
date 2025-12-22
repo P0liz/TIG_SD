@@ -1,8 +1,12 @@
 import json
 from os import makedirs
 from os.path import join, exists
+from posixpath import basename
 
+import numpy as np
 from numpy import mean
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 import evaluator
 from folder import Folder
@@ -50,6 +54,26 @@ class Individual:
         filedest = dst + ".json"
         with open(filedest, 'w') as f:
             (json.dump(data, f, sort_keys=True, indent=4))
+        # Save member images and latents
+        filename1 = join(dst, basename(
+            'archived_' + str(1) +
+            '_mem1_l_' + str(self.m1.predicted_label)))
+        plt.imsave(filename1, self.m1.image,
+                   cmap=cm.gray,
+                   format='png')
+        np.save(filename1, self.m1.image)
+        assert (np.array_equal(self.m1.image,
+                               np.load(filename1 + '.npy')))
+
+        filename2 = join(dst, basename(
+            'archived_' + str(2) +
+            '_mem2_l_' + str(self.m2.predicted_label)))
+        plt.imsave(filename2, self.m2.image,
+                   cmap=cm.gray,
+                   format='png')
+        np.save(filename2, self.m2.image)
+        assert (np.array_equal(self.m2.image,
+                               np.load(filename2 + '.npy')))
 
     def evaluate(self, archive):
         self.sparseness = None

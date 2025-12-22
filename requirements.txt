@@ -74,5 +74,4 @@ typer-slim==0.20.1
 typing_extensions==4.15.0
 urllib3==2.6.2
 Werkzeug==3.1.4
-wrapt==1.12.1
 zipp==3.23.0

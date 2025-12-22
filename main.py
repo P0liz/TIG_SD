@@ -6,7 +6,7 @@ from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 
-def main(prompt, expected_label, max_steps=100):
+def main(prompt, expected_label, max_steps=50):
 
     # Starting from a random latent noise vector
     latent = torch.randn(1, 4, 64, 64, dtype=torch.float32)

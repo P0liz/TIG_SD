@@ -32,8 +32,8 @@ class SDPipelineManager:
         print("Loading Stable Diffusion pipeline...")
         
         # Determine dtype based on device
-        dtype = torch.float16 if DEVICE == "cuda:0" else torch.float32
-        variant = "fp16" if dtype == torch.float16 else None
+        dtype = torch.float16 #if DEVICE == "cuda:0" else torch.float32
+        variant = "fp16" #if dtype == torch.float16 else None
         
         # Load pipeline
         self._pipe = StableDiffusionPipeline.from_pretrained(
