@@ -20,7 +20,7 @@ class Predictor:
     classifier.eval()
     print("Loaded classifier")
     
-    def predict_single(img):
+    def predict_single(ref, img):
         #img_detached = img.detach()
         original_logit = Predictor.classifier(img).squeeze().detach().cpu().numpy()
         original_label = np.argmax(original_logit).item()
@@ -29,7 +29,10 @@ class Predictor:
         # but this does not account for cases when all logits are similar (model is unsure)
         #probs = F.softmax(torch.tensor(original_logit), dim=0)
         #confidence = probs[original_label].item()
-        confidence = Predictor.confidence_margin(torch.tensor(original_logit))
+
+        #confidence = Predictor.confidence_margin(torch.tensor(original_logit))
+
+        confidence = -torch.cosine_similarity(ref, img)
         return original_label, confidence
 
     def confidence_margin(logits):

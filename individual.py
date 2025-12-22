@@ -58,21 +58,23 @@ class Individual:
         filename1 = join(dst, basename(
             'archived_' + str(1) +
             '_mem1_l_' + str(self.m1.predicted_label)))
-        plt.imsave(filename1, self.m1.image,
+        img_np = self.m1.image.detach().cpu().numpy()
+        plt.imsave(filename1, img_np,
                    cmap=cm.gray,
                    format='png')
-        np.save(filename1, self.m1.image)
-        assert (np.array_equal(self.m1.image,
+        np.save(filename1, img_np)
+        assert (np.array_equal(img_np,
                                np.load(filename1 + '.npy')))
 
         filename2 = join(dst, basename(
             'archived_' + str(2) +
             '_mem2_l_' + str(self.m2.predicted_label)))
-        plt.imsave(filename2, self.m2.image,
+        img_np = self.m2.image.detach().cpu().numpy()
+        plt.imsave(filename2, img_np,
                    cmap=cm.gray,
                    format='png')
-        np.save(filename2, self.m2.image)
-        assert (np.array_equal(self.m2.image,
+        np.save(filename2, img_np)
+        assert (np.array_equal(img_np,
                                np.load(filename2 + '.npy')))
 
     def evaluate(self, archive):

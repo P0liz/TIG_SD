@@ -14,7 +14,7 @@ def main(prompt, expected_label, max_steps=50):
 
     # Initial generation and validation
     img = DigitMutator(digit).generate(prompt)
-    prediction, confidence = Predictor.predict_single(img)
+    prediction, confidence = Predictor.predict_single(img.image, img.image)
     
     # Initial assignment
     digit.predicted_label = prediction
@@ -36,7 +36,7 @@ def main(prompt, expected_label, max_steps=50):
     # Iterative mutation process
     for step in range(1, max_steps + 1):
         DigitMutator(digit).mutate(prompt)
-        prediction, confidence = Predictor.predict_single(digit.image)
+        prediction, confidence = Predictor.predict_single(reference.image, digit.image)
         
         digit.predicted_label = prediction
         digit.confidence = confidence
