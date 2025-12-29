@@ -6,7 +6,7 @@ from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 
-def main(prompt, expected_label, max_steps=2):
+def main(prompt, expected_label, max_steps=100):
 
     # Starting from a random latent noise vector
     latent = torch.randn(1, 4, 64, 64, dtype=torch.float32)
@@ -29,7 +29,7 @@ def main(prompt, expected_label, max_steps=2):
         ind = Individual(digit, digit)
         ind.export()
         raise RuntimeError("Initial latent does not satisfy the label")
-    reference = digit   # reference digit for distance calculations from original
+    reference = digit.clone()   # reference digit for distance calculations from original
 
     print(f" Step 0 | conf={digit.confidence:.3f}")
 

@@ -18,6 +18,10 @@ class MnistMember:
 
     def clone(self):
         clone_digit = MnistMember(self.latent, self.expected_label)
+        clone_digit.image = self.image
+        clone_digit.predicted_label = self.predicted_label
+        clone_digit.confidence = self.confidence
+        clone_digit.correctly_classified = self.correctly_classified
         return clone_digit
 
     def cosine_similarity(self, other):
