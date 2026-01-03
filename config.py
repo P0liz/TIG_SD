@@ -62,9 +62,15 @@ LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
 DELTA = 0.05
 
 # Torch settings
-DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-DTYPE = torch.float16 if DEVICE == "cuda:0" else torch.float32
-VARIANT = "fp16" if DTYPE == torch.float16 else None
+if torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+    DTYPE = torch.float16
+    VARIANT = "fp16"
+else:
+    DEVICE = torch.device("cpu")
+    DTYPE = torch.float32
+    VARIANT = None
 
-HEIGHT = 224
-WIDTH = 224
+# Standard image dimensions for 1.5 Stable Diffusion
+HEIGHT = 512
+WIDTH = 512

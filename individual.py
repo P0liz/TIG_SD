@@ -10,7 +10,6 @@ import matplotlib.cm as cm
 
 import evaluator
 from folder import Folder
-from config import EXPLABEL
 
 
 class Individual:
@@ -37,11 +36,11 @@ class Individual:
         self.aggregate_ff = None
         self.archive_candidate = None
 
+    #TODO: possibly change with something useful
     def to_dict(self):
         return {'id': str(self.id),
                 'seed': str(self.seed),
-                #TODO: expected label depending on member
-                'expected_label': str(EXPLABEL),
+                'expected_label': str(self.m1.expected_label),
                 'm1': str(self.m1.id),
                 'm2': str(self.m2.id)
         }

@@ -35,7 +35,7 @@ class SDPipelineManager:
         self._pipe = StableDiffusionPipeline.from_pretrained(
             MODEL_ID_PATH, 
             variant=VARIANT,
-            dtype=DTYPE,     
+            torch_dtype=DTYPE,     
             safety_checker=None
         ).to(DEVICE)
         print("Loaded Stable Diffusion model")
@@ -126,9 +126,6 @@ def generate(prompt, mutated_latent=None):
     """
     pipe = get_pipeline()
     with torch.inference_mode():
-    # Ensure latents match pipeline device and dtype to avoid dtype mismatches
-        if mutated_latent is not None:
-            mutated_latent = mutated_latent.to(device=DEVICE, dtype=DTYPE)
         image = pipe(
             prompt=prompt, 
             guidance_scale=3.5, 
@@ -162,7 +159,10 @@ def process_image(image):
     gray_image = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
 
     # Resize the image to 28x28 pixels
-    resized_image = cv2.resize(gray_image, (28, 28))
+    # interpolation=cv2.INTER_LINEAR is Default - balanced speed/quality
+    #resized_image = cv2.resize(gray_image, (28, 28))
+    # interpolation=cv2.INTER_AREA is Better quality for shrinking
+    resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_AREA)
 
     # Convert the numpy array back to PIL Image (to use torchvision transforms)
     img_pil = Image.fromarray(resized_image)
