@@ -4,7 +4,7 @@ import cv2
 import torch
 
 from torchvision import transforms
-from config import DEVICE, MODEL_ID_PATH, LORA_PATH, LORA_WEIGHTS
+from config import DEVICE, MODEL_ID_PATH, LORA_PATH, LORA_WEIGHTS, DTYPE, VARIANT
 from diffusers import StableDiffusionPipeline
 from diffusers.schedulers import DDIMScheduler
 
@@ -31,15 +31,11 @@ class SDPipelineManager:
         
         print("Loading Stable Diffusion pipeline...")
         
-        # Determine dtype based on device
-        dtype = torch.float16 #if DEVICE == "cuda:0" else torch.float32
-        variant = "fp16" #if dtype == torch.float16 else None
-        
         # Load pipeline
         self._pipe = StableDiffusionPipeline.from_pretrained(
             MODEL_ID_PATH, 
-            variant=variant,
-            dtype=dtype,     
+            variant=VARIANT,
+            dtype=DTYPE,     
             safety_checker=None
         ).to(DEVICE)
         print("Loaded Stable Diffusion model")
@@ -130,12 +126,15 @@ def generate(prompt, mutated_latent=None):
     """
     pipe = get_pipeline()
     with torch.inference_mode():
+    # Ensure latents match pipeline device and dtype to avoid dtype mismatches
+        if mutated_latent is not None:
+            mutated_latent = mutated_latent.to(device=DEVICE, dtype=DTYPE)
         image = pipe(
             prompt=prompt, 
             guidance_scale=3.5, 
             num_inference_steps=pipeline_manager.num_inference_steps, 
             latents=mutated_latent)["images"][0]
-        # preprocess image to 28x28 grayscale tensor
+    # preprocess image to 28x28 grayscale tensor
     image_tensor = process_image(image).unsqueeze(0).to(DEVICE)  # Add batch dimension and move to device
     return mutated_latent, image_tensor
     

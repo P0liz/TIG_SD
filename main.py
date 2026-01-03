@@ -1,15 +1,21 @@
 import torch
-import numpy as np
+import random
+import re
 
 from individual import Individual
 from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
+from mutation_manager import get_pipeline
+from config import DEVICE, HEIGHT, WIDTH , DTYPE
 
 def main(prompt, expected_label, max_steps=100):
 
     # Starting from a random latent noise vector
-    latent = torch.randn(1, 4, 64, 64, dtype=torch.float32)
+    latent = torch.randn((1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8), 
+                        device=DEVICE, 
+                        dtype=DTYPE)
+    print("Generated initial latent with size:", latent.shape)
     digit = MnistMember(latent, expected_label)
 
     # Initial generation and validation
@@ -52,17 +58,19 @@ def main(prompt, expected_label, max_steps=100):
         )
 
         if not digit.correctly_classified:
+            print(digit.predicted_label, digit.expected_label)
             print(f" Label flipped at step {step}")
             break
 
     ind = Individual(reference, digit)  # Create final individual to see results
-    #ind.members_distance = reference.image_distance(digit)
-    #ind.members_distance = cosine_similarity(reference.latent, digit.latent)
     ind.export()
 
-# TODO: Allow also different digits to be generated
+
 if __name__ == "__main__":
-    main(prompt="A photo of Five5 Number5", expected_label=5)
+    prompts =[ "A photo of Z0ero Number0","A photo of one1 Number1","A photo of two2 Number2 ","A photo of three3 Number3","A photo of Four4 Number4","A photo of Five5 Number5","A photo of Six6 Number6","A photo of Seven7 Number7 ","A photo of Eight8 Number8","A photo of Nine9 Number9"]
+    randprompt = random.choice(prompts)
+    expected_label = int(re.search(r"Number(\d+)", randprompt).group(1)) 
+    main(prompt=randprompt, expected_label=expected_label)
     print("GAME OVER")
 
 # source ./venv/bin/activate

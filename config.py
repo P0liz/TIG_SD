@@ -56,8 +56,15 @@ INTERPRETER = '/home/vin/yes/envs/tf_gpu/bin/python'
 CLASSIFIER_WEIGHTS_PATH = './mnist_classifier/weight/MNIST_conv_classifier.pth'
 
 # Stable Diffusion 
-DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 LORA_PATH = "./SD_weights"
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
 DELTA = 0.05
+
+# Torch settings
+DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+DTYPE = torch.float16 if DEVICE == "cuda:0" else torch.float32
+VARIANT = "fp16" if DTYPE == torch.float16 else None
+
+HEIGHT = 224
+WIDTH = 224

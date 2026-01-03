@@ -25,13 +25,15 @@ class Predictor:
         original_logit = Predictor.classifier(dig.image).squeeze().detach().cpu().numpy()
         original_label = np.argmax(original_logit).item()
         
-        # TODO: not really a confidence score, just appling softmax to logits
+        # 1) not really a confidence score, just appling softmax to logits
         # but this does not account for cases when all logits are similar (model is unsure)
         #probs = F.softmax(torch.tensor(original_logit), dim=0)
         #confidence = probs[original_label].item()
 
+        # 2) margin between top-2 logits as confidence score
         #confidence = Predictor.confidence_margin(torch.tensor(original_logit))
 
+        # 3) Using distance in latent space as confidence measure
         confidence = torch.norm(dig.latent - ref.latent).item()
         return original_label, confidence
 
