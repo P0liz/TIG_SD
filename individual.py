@@ -27,6 +27,7 @@ class Individual:
         self.archive_candidate = None
         self.m1 = member1
         self.m2 = member2
+        self.misstep = 0
 
     def reset(self):
         self.id = Individual.COUNT
@@ -42,7 +43,8 @@ class Individual:
                 'seed': str(self.seed),
                 'expected_label': str(self.m1.expected_label),
                 'm1': str(self.m1.id),
-                'm2': str(self.m2.id)
+                'm2': str(self.m2.id),
+                'steps' : str(self.misstep)
         }
     
     def export(self):

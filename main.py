@@ -7,7 +7,7 @@ from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 from mutation_manager import get_pipeline
-from config import DEVICE, HEIGHT, WIDTH , DTYPE
+from config import DEVICE, HEIGHT, WIDTH , DTYPE, TRYNEW
 
 def main(prompt, expected_label, max_steps=100):
 
@@ -15,7 +15,6 @@ def main(prompt, expected_label, max_steps=100):
     latent = torch.randn((1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8), 
                         device=DEVICE, 
                         dtype=DTYPE)
-    print("Generated initial latent with size:", latent.shape)
     digit = MnistMember(latent, expected_label)
 
     # Initial generation and validation
@@ -37,7 +36,11 @@ def main(prompt, expected_label, max_steps=100):
         raise RuntimeError("Initial latent does not satisfy the label")
     reference = digit.clone()   # reference digit for distance calculations from original
 
-    print(f" Step 0 | conf={digit.confidence:.3f}")
+    print(
+        f"[Step 0] "
+        f"exp={digit.expected_label} "
+        f"conf={digit.confidence:.3f}"
+    )
 
     # Iterative mutation process
     for step in range(1, max_steps + 1):
@@ -63,14 +66,17 @@ def main(prompt, expected_label, max_steps=100):
             break
 
     ind = Individual(reference, digit)  # Create final individual to see results
+    ind.misstep = step
     ind.export()
 
 
 if __name__ == "__main__":
     prompts =[ "A photo of Z0ero Number0","A photo of one1 Number1","A photo of two2 Number2 ","A photo of three3 Number3","A photo of Four4 Number4","A photo of Five5 Number5","A photo of Six6 Number6","A photo of Seven7 Number7 ","A photo of Eight8 Number8","A photo of Nine9 Number9"]
-    randprompt = random.choice(prompts)
-    expected_label = int(re.search(r"Number(\d+)", randprompt).group(1)) 
-    main(prompt=randprompt, expected_label=expected_label)
-    print("GAME OVER")
+    for i in range(0,2):
+        randprompt = random.choice(prompts)
+        expected_label = int(re.search(r"Number(\d+)", randprompt).group(1)) 
+        main(prompt=randprompt, expected_label=expected_label)
+        print("GAME OVER")
+        TRYNEW = not TRYNEW
 
 # source ./venv/bin/activate

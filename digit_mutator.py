@@ -8,6 +8,8 @@ class DigitMutator:
         self.digit = digit
         #self.seed = digit.seed
 
+    #TODO: attualmente non sempre si raggiunge il flipping del label
+    # quindi si potrebbe aumentare il DELTA di base, oppure cambiare il calcolo della confidence (predictor.py)
     def mutate(self, prompt):
         # Intensità progressiva della mutazione
         # TODO: cambiare delta in base alla fitness 

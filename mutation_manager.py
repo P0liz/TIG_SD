@@ -4,7 +4,7 @@ import cv2
 import torch
 
 from torchvision import transforms
-from config import DEVICE, MODEL_ID_PATH, LORA_PATH, LORA_WEIGHTS, DTYPE, VARIANT
+from config import DEVICE, MODEL_ID_PATH, LORA_PATH, LORA_WEIGHTS, DTYPE, VARIANT, TRYNEW
 from diffusers import StableDiffusionPipeline
 from diffusers.schedulers import DDIMScheduler
 
@@ -159,10 +159,12 @@ def process_image(image):
     gray_image = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
 
     # Resize the image to 28x28 pixels
-    # interpolation=cv2.INTER_LINEAR is Default - balanced speed/quality
-    #resized_image = cv2.resize(gray_image, (28, 28))
-    # interpolation=cv2.INTER_AREA is Better quality for shrinking
-    resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_AREA)
+    if TRYNEW:
+        # interpolation=cv2.INTER_LINEAR is Default - balanced speed/quality
+        resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LANCZOS4)
+    else:
+        # interpolation=cv2.INTER_AREA is Better quality for shrinking
+        resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LINEAR)
 
     # Convert the numpy array back to PIL Image (to use torchvision transforms)
     img_pil = Image.fromarray(resized_image)

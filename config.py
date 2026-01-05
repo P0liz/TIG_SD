@@ -74,3 +74,6 @@ else:
 # Standard image dimensions for 1.5 Stable Diffusion
 HEIGHT = 512
 WIDTH = 512
+
+# Dev testing
+TRYNEW = False
