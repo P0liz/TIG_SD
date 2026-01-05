@@ -4,9 +4,15 @@ from os import makedirs
 
 
 class Folder:
-    run_id = str(Timer.start.strftime('%s'))
-    DST = "runs/run_" + run_id
-    if not exists(DST):
-        makedirs(DST)
-    DST_ARC = join(DST, "archive")
-    DST_IND = join(DST, "inds")
+    run_id = None
+    DST = None
+    DST_ARC = None
+    DST_IND = None
+
+    def initialize(cls, custom_run_id=None):
+        cls.run_id = custom_run_id or str(Timer.start.strftime('%s'))
+        cls.DST = "runs/run_" + cls.run_id
+        if not exists(cls.DST):
+            makedirs(cls.DST)
+        cls.DST_ARC = join(cls.DST, "archive")
+        cls.DST_IND = join(cls.DST, "inds")
