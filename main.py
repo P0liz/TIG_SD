@@ -16,6 +16,10 @@ def main(prompt, expected_label, max_steps=100):
     latent = torch.randn((1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8), 
                         device=DEVICE, 
                         dtype=DTYPE)
+    if not TRYNEW: 
+        # Scala il latent secondo lo scheduler
+        latent = latent * get_pipeline().scheduler.init_noise_sigma
+
     digit = MnistMember(latent, expected_label)
 
     # Initial generation and validation
@@ -31,9 +35,9 @@ def main(prompt, expected_label, max_steps=100):
         digit.correctly_classified = False
 
     if not digit.correctly_classified:
-        print(prompt, expected_label)
+        print(prompt, " - ", expected_label)
         print(
-            f"pred={digit.predicted_label}"
+            f"pred={digit.predicted_label} "
             f"exp={digit.expected_label}"
         )
         ind = Individual(digit, digit)

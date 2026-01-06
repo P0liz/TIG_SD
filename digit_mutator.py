@@ -14,7 +14,7 @@ class DigitMutator:
         # Intensità progressiva della mutazione
         # TODO: cambiare delta in base alla fitness 
         base_delta = DELTA
-        delta = base_delta * exp(-self.digit.confidence) + base_delta
+        delta = base_delta * exp(-self.digit.confidence)
 
         # Mutazione nel latent space
         mutated_latent = mutation_manager.mutate(self.digit.latent, delta)

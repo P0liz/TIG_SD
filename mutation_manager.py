@@ -159,12 +159,18 @@ def process_image(image):
     gray_image = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
 
     # Resize the image to 28x28 pixels
+    resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LANCZOS4)
+    """
     if TRYNEW:
-        # interpolation=cv2.INTER_LINEAR is Default - balanced speed/quality
+        # interpolation=cv2.INTER_AREA is Better quality for shrinking
+        #resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LANCZOS4)
+        # interpolation=cv2.INTER_LANCZOS4 is for better general quality
         resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LANCZOS4)
     else:
-        # interpolation=cv2.INTER_AREA is Better quality for shrinking
+        
+        # interpolation=cv2.INTER_LINEAR is Default - balanced speed/quality
         resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LINEAR)
+    """
 
     # Convert the numpy array back to PIL Image (to use torchvision transforms)
     img_pil = Image.fromarray(resized_image)

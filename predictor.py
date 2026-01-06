@@ -1,10 +1,8 @@
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 from mnist_classifier.model_mnist import MnistClassifier
-from config import num_classes, DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH
-
+from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH
 
 class Predictor:
 
@@ -22,76 +20,32 @@ class Predictor:
     
     def predict_single(ref, dig):
         #img_detached = img.detach()
-        original_logit = Predictor.classifier(dig.image).squeeze().detach().cpu().numpy()
-        original_label = np.argmax(original_logit).item()
+        new_logits = Predictor.classifier(dig.image).squeeze().detach().cpu().numpy()
         
-        # 1) just appling softmax to logits and getting the margin between the top 2
-        sorted_logits = np.sort(original_logit)[::-1]
-        confidence = sorted_logits[0] - sorted_logits[1]
+        # 1) was just applying softmax to the logits and getting the higher one
 
-        # 2) margin between top-2 logits as confidence score
-        #confidence = Predictor.confidence_margin(torch.tensor(original_logit))
+        # 2) margin between top logits as confidence score
+        confidence, label = Predictor.confidence_margin(new_logits, ref.expected_label)
 
         # 3) Using distance in latent space as confidence measure
         #confidence = torch.norm(dig.latent - ref.latent).item()
         #normalized_conf = torch.sigmoid(-torch.tensor(confidence)).item()
-        return original_label, confidence
+        #label = np.argmax(new_logits)
+        return label, confidence
 
-    def confidence_margin(logits):
-        sorted_logits, _ = torch.sort(logits, descending=True)
-        margin = sorted_logits[0] - sorted_logits[1]
-        return margin.item()
-
-    """ TODO: understand if needed
-    @staticmethod
-    def predict(img, label):
-        
-        # Predictions vector
-        predictions = Predictor.model.predict(img)
-
-        predictions1 = list()
-        confidences = list()
-        for i in range(len(predictions)):
-            preds = predictions[i]
-            explabel = label[i]
-            prediction1, prediction2 = np.argsort(-preds)[:2]
-
-            # Activation level corresponding to the expected class
-            confidence_expclass = preds[explabel]
-
-            if prediction1 != explabel:
-                confidence_notclass = preds[prediction1]
-            else:
-                confidence_notclass = preds[prediction2]
-
-            confidence = confidence_expclass - confidence_notclass
-            predictions1.append(prediction1)
-            confidences.append(confidence)
-
-        return predictions1, confidences
-
-    @staticmethod
-    def predict_single(img, label):
-        explabel = (np.expand_dims(label, 0))
-
-        # Convert class vectors to binary class matrices
-        explabel = keras.utils.to_categorical(explabel, num_classes)
-        explabel = np.argmax(explabel.squeeze())
-
-        # Predictions vector
-        predictions = Predictor.model.predict(img)
-
-        prediction1, prediction2 = np.argsort(-predictions[0])[:2]
-
-        # Activation level corresponding to the expected class
-        confidence_expclass = predictions[0][explabel]
-
-        if prediction1 != label:
-            confidence_notclass = predictions[0][prediction1]
+    def confidence_margin(logits, exp_label):
+        expected_logit = logits[exp_label]
+        # Select the two best indices [perturbed logit]
+        best_indices = np.argsort(-logits)[:2]
+        best_index1, best_index2 = best_indices
+        if best_index1 == exp_label:
+            best_but_not_expected = best_index2
         else:
-            confidence_notclass = predictions[0][prediction2]
+            best_but_not_expected = best_index1
+        # Get the best prediction
+        new_logit = logits[best_but_not_expected]
+        # Calculate margin between the expected and the best logits
+        margin = expected_logit - new_logit
 
-        confidence = confidence_expclass - confidence_notclass
-
-        return prediction1, confidence
-    """
+        new_label = np.argmax(logits)
+        return margin, new_label

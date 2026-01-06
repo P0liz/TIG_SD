@@ -42,8 +42,9 @@ class Individual:
         return {'id': str(self.id),
                 'seed': str(self.seed),
                 'expected_label': str(self.m1.expected_label),
-                'm1': str(self.m1.id),
-                'm2': str(self.m2.id),
+                'm1': str(self.m1.predicted_label),
+                'm2': str(self.m2.predicted_label),
+                'm2_confidence' : str(self.m2.confidence),
                 'steps' : str(self.misstep)
         }
     
