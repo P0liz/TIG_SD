@@ -10,14 +10,17 @@ class DigitMutator:
 
     #TODO: attualmente non sempre si raggiunge il flipping del label
     # quindi si potrebbe aumentare il DELTA di base, oppure cambiare il calcolo della confidence (predictor.py)
-    def mutate(self, prompt):
+    def mutate(self, prompt, step, noise_x, noise_y):
         # Intensità progressiva della mutazione
-        # TODO: cambiare delta in base alla fitness 
+        # Fare in modo che più alta è la confidence e maggiore diventa il delta 
         base_delta = DELTA
-        delta = base_delta * exp(-self.digit.confidence)
+        delta = base_delta * exp(self.digit.confidence)
 
         # Mutazione nel latent space
-        mutated_latent = mutation_manager.mutate(self.digit.latent, delta)
+        #mutated_latent = mutation_manager.mutate(self.digit.latent, delta)
+
+        # Circular walk mutation
+        mutated_latent = mutation_manager.mutate_circular(step, noise_x, noise_y)
 
         # Generazione immagine dal latente mutato
         _, mutated_image = mutation_manager.generate(prompt=prompt, mutated_latent=mutated_latent)

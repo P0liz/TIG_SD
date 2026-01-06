@@ -7,18 +7,18 @@ from individual import Individual
 from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
-from mutation_manager import get_pipeline
-from config import DEVICE, HEIGHT, WIDTH , DTYPE, TRYNEW
+from mutation_manager import get_pipeline, circular_latent_walk
+from config import DEVICE, HEIGHT, WIDTH , DTYPE, TRYNEW, STEPS
 
-def main(prompt, expected_label, max_steps=100):
+def main(prompt, expected_label, max_steps=STEPS):
 
     # Starting from a random latent noise vector
     latent = torch.randn((1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8), 
                         device=DEVICE, 
                         dtype=DTYPE)
-    if not TRYNEW: 
+    #if TRYNEW: 
         # Scala il latent secondo lo scheduler
-        latent = latent * get_pipeline().scheduler.init_noise_sigma
+        #latent = latent * get_pipeline().scheduler.init_noise_sigma
 
     digit = MnistMember(latent, expected_label)
 
@@ -35,25 +35,30 @@ def main(prompt, expected_label, max_steps=100):
         digit.correctly_classified = False
 
     if not digit.correctly_classified:
-        print(prompt, " - ", expected_label)
+        print(prompt, " - exp: ", expected_label)
         print(
             f"pred={digit.predicted_label} "
             f"exp={digit.expected_label}"
         )
         ind = Individual(digit, digit)
         ind.export()
-        raise RuntimeError("Initial latent does not satisfy the label")
+        print("Initial latent does not satisfy the label")
+        return
+    
     reference = digit.clone()   # reference digit for distance calculations from original
-
     print(
-        f"[Step 0] "
+        f"[000] "
         f"exp={digit.expected_label} "
         f"conf={digit.confidence:.3f}"
     )
 
+    # Circular walk 
+    noise_x = torch.randn_like(latent)  # Direzione X (fissa)
+    noise_y = torch.randn_like(latent)  # Direzione Y (fissa)
+    
     # Iterative mutation process
     for step in range(1, max_steps + 1):
-        DigitMutator(digit).mutate(prompt)
+        DigitMutator(digit).mutate(prompt, step, noise_x, noise_y)
         prediction, confidence = Predictor.predict_single(reference, digit)
         
         digit.predicted_label = prediction
@@ -63,15 +68,20 @@ def main(prompt, expected_label, max_steps=100):
         else:
             digit.correctly_classified = False
 
+        dist = digit.cosine_similarity(reference)
         print(
             f"[{step:03d}] "
             f"pred={digit.predicted_label} "
-            f"dist={digit.confidence:.3f}"
+            f"conf={digit.confidence:.3f} "
+            f"dist={dist:.3f}"
         )
 
         if not digit.correctly_classified:
-            print(digit.predicted_label, digit.expected_label)
-            print(f" Label flipped at step {step}")
+            print(
+                f" Label flipped at step {step} "
+                f"pred={digit.predicted_label} "
+                f"exp={digit.expected_label}"
+            )
             break
 
     ind = Individual(reference, digit)  # Create final individual to see results

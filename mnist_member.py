@@ -25,7 +25,10 @@ class MnistMember:
         return clone_digit
 
     def cosine_similarity(self, other):
-        return torch.dot(self.latent, other.latent) / (torch.norm(self.latent) * torch.norm(other.latent))
+        # Flatten and use cosine_similarity function
+        self_flat = self.latent.flatten().unsqueeze(0)
+        other_flat = other.latent.flatten().unsqueeze(0)
+        return torch.nn.functional.cosine_similarity(self_flat, other_flat).item()
 
     def image_distance(self, other):
         return torch.linalg.norm(self.image - other.image)

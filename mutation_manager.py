@@ -2,9 +2,10 @@ from PIL import Image
 import numpy as np
 import cv2
 import torch
+import math
 
 from torchvision import transforms
-from config import DEVICE, MODEL_ID_PATH, LORA_PATH, LORA_WEIGHTS, DTYPE, VARIANT, TRYNEW
+from config import DEVICE, MODEL_ID_PATH, LORA_PATH, LORA_WEIGHTS, DTYPE, VARIANT, TRYNEW, STEPS
 from diffusers import StableDiffusionPipeline
 from diffusers.schedulers import DDIMScheduler
 
@@ -112,6 +113,24 @@ def mutate(z_orig, delta):
     z_mut = z_orig + delta * epsilon
     return z_mut
 
+# TODO: testare questo e capire quale raggio usare
+def mutate_circular(z_orig, step, noise_x, noise_y, total_steps=STEPS, noise_scale=1.0):
+    """
+    Muta il latent seguendo un punto specifico del percorso circolare
+    
+    Args:
+        step: int - quale step del walk (0 a total_steps-1)
+        total_steps: int - numero totale di step nel cerchio
+        noise_x, noise_y: torch.Tensor - direzioni di rumore (opzionali, se vuoi riusarle)
+    """
+    t = (step / total_steps) * 2 * math.pi
+    scale_x = math.cos(t)
+    scale_y = math.sin(t)
+    
+    z_mut = z_orig + noise_scale * (scale_x * noise_x + scale_y * noise_y)
+    
+    return z_mut
+
 def generate(prompt, mutated_latent=None):
     """
     Genera un'immagine usando Stable Diffusion
@@ -136,8 +155,6 @@ def generate(prompt, mutated_latent=None):
     return mutated_latent, image_tensor
     
     
-
-# TODO: capire come funziona e cosa succede ancora prima di passare l'immagine al classificatore
 def process_image(image):
     """
     Convert a 3-channel RGB PIL Image to grayscale, resize it to 28x28 pixels,
@@ -159,11 +176,11 @@ def process_image(image):
     gray_image = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
 
     # Resize the image to 28x28 pixels
-    resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LANCZOS4)
+    resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_AREA)
     """
     if TRYNEW:
         # interpolation=cv2.INTER_AREA is Better quality for shrinking
-        #resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LANCZOS4)
+        #resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_AREA)
         # interpolation=cv2.INTER_LANCZOS4 is for better general quality
         resized_image = cv2.resize(gray_image, (28, 28), interpolation=cv2.INTER_LANCZOS4)
     else:
