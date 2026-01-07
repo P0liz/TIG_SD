@@ -37,17 +37,18 @@ class Individual:
         self.aggregate_ff = None
         self.archive_candidate = None
 
-    #TODO: possibly change with something useful
+    # TODO: possibly change with something useful
     def to_dict(self):
-        return {'id': str(self.id),
-                'seed': str(self.seed),
-                'expected_label': str(self.m1.expected_label),
-                'm1': str(self.m1.predicted_label),
-                'm2': str(self.m2.predicted_label),
-                'm2_confidence' : str(self.m2.confidence),
-                'steps' : str(self.misstep)
+        return {
+            "id": str(self.id),
+            "seed": str(self.seed),
+            "expected_label": str(self.m1.expected_label),
+            "m1": str(self.m1.predicted_label),
+            "m2": str(self.m2.predicted_label),
+            "m2_confidence": str(self.m2.confidence),
+            "steps": str(self.misstep),
         }
-    
+
     def export(self):
         # Base directory for individuals
         makedirs(Folder.DST_IND, exist_ok=True)
@@ -66,15 +67,10 @@ class Individual:
             png_path = join(ind_dir, base_name + ".png")
             npy_path = join(ind_dir, base_name + ".npy")
 
-            img_np = member.image.detach().cpu().numpy().squeeze()
+            img_np = member.image_tensor.detach().cpu().numpy().squeeze()
 
             # Save image (visual)
-            plt.imsave(
-                png_path,
-                img_np,
-                cmap=cm.gray,
-                format="png"
-            )
+            plt.imsave(png_path, img_np, cmap=cm.gray, format="png")
 
             # Save raw tensor (scientific)
             np.save(npy_path, img_np)
@@ -99,7 +95,7 @@ class Individual:
         filename1 = join(dst, basename(
             'archived_' + str(1) +
             '_mem1_l_' + str(self.m1.predicted_label)))
-        img_np = self.m1.image.detach().cpu().numpy()
+        img_np = self.m1.image_tensor.detach().cpu().numpy()
         plt.imsave(filename1, img_np,
                    cmap=cm.gray,
                    format='png')
@@ -110,7 +106,7 @@ class Individual:
         filename2 = join(dst, basename(
             'archived_' + str(2) +
             '_mem2_l_' + str(self.m2.predicted_label)))
-        img_np = self.m2.image.detach().cpu().numpy()
+        img_np = self.m2.image_tensor.detach().cpu().numpy()
         plt.imsave(filename2, img_np,
                    cmap=cm.gray,
                    format='png')
@@ -124,16 +120,19 @@ class Individual:
 
         if self.misclass is None:
             # Calculate fitness function 2
-            self.misclass = evaluator.evaluate_ff2(self.m1.confidence,
-                                                   self.m2.confidence)
+            self.misclass = evaluator.evaluate_ff2(
+                self.m1.confidence, self.m2.confidence
+            )
 
-            self.archive_candidate = (self.m1.correctly_classified !=
-                                      self.m2.correctly_classified)
+            self.archive_candidate = (
+                self.m1.correctly_classified != self.m2.correctly_classified
+            )
 
         if self.members_distance is None:
             # Calculate fitness function 1
-            self.members_distance = evaluator.evaluate_ff1(self.m1.purified,
-                                                           self.m2.purified)
+            self.members_distance = evaluator.evaluate_ff1(
+                self.m1.purified, self.m2.purified
+            )
 
         # Recalculate sparseness at each iteration
         self.sparseness = evaluator.evaluate_sparseness(self, archive)
@@ -141,8 +140,9 @@ class Individual:
             print(self.sparseness)
             print("BUG")
 
-        self.aggregate_ff = evaluator.evaluate_aggregate_ff(self.sparseness,
-                                                            self.members_distance)
+        self.aggregate_ff = evaluator.evaluate_aggregate_ff(
+            self.sparseness, self.members_distance
+        )
 
         return self.aggregate_ff, self.misclass
 

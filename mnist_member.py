@@ -6,8 +6,9 @@ class MnistMember:
     def __init__(self, latent, expected_label):
         #self.seed = seed
         self.id = MnistMember.COUNT
-        # latent vector
         self.image = None
+        # latent vector
+        self.image_tensor = None
         self.latent = latent
         # label
         self.expected_label = expected_label
@@ -19,6 +20,7 @@ class MnistMember:
     def clone(self):
         clone_digit = MnistMember(self.latent, self.expected_label)
         clone_digit.image = self.image
+        clone_digit.image_tensor = self.image_tensor
         clone_digit.predicted_label = self.predicted_label
         clone_digit.confidence = self.confidence
         clone_digit.correctly_classified = self.correctly_classified
@@ -31,5 +33,5 @@ class MnistMember:
         return torch.nn.functional.cosine_similarity(self_flat, other_flat).item()
 
     def image_distance(self, other):
-        return torch.linalg.norm(self.image - other.image)
+        return torch.linalg.norm(self.image_tensor - other.image_tensor)
         

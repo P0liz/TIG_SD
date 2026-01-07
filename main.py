@@ -1,31 +1,33 @@
 import torch
 import random
 import re
+from PIL import Image
 
 from folder import Folder
 from individual import Individual
 from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
-from mutation_manager import get_pipeline, circular_latent_walk
-from config import DEVICE, HEIGHT, WIDTH , DTYPE, TRYNEW, STEPS
+from mutation_manager import get_pipeline
+from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS
+
 
 def main(prompt, expected_label, max_steps=STEPS):
-
     # Starting from a random latent noise vector
-    latent = torch.randn((1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8), 
-                        device=DEVICE, 
-                        dtype=DTYPE)
-    #if TRYNEW: 
-        # Scala il latent secondo lo scheduler
-        #latent = latent * get_pipeline().scheduler.init_noise_sigma
+    latent = torch.randn(
+        (1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
+        device=DEVICE,
+        dtype=DTYPE,
+    )
+    # Scala il latent secondo lo scheduler
+    latent = latent * get_pipeline().scheduler.init_noise_sigma
 
     digit = MnistMember(latent, expected_label)
 
     # Initial generation and validation
     DigitMutator(digit).generate(prompt)
     prediction, confidence = Predictor.predict_single(digit, digit)
-    
+
     # Initial assignment
     digit.predicted_label = prediction
     digit.confidence = confidence
@@ -36,31 +38,29 @@ def main(prompt, expected_label, max_steps=STEPS):
 
     if not digit.correctly_classified:
         print(prompt, " - exp: ", expected_label)
-        print(
-            f"pred={digit.predicted_label} "
-            f"exp={digit.expected_label}"
-        )
+        print(f"pred={digit.predicted_label} " f"exp={digit.expected_label}")
         ind = Individual(digit, digit)
         ind.export()
         print("Initial latent does not satisfy the label")
         return
-    
-    reference = digit.clone()   # reference digit for distance calculations from original
-    print(
-        f"[000] "
-        f"exp={digit.expected_label} "
-        f"conf={digit.confidence:.3f}"
-    )
 
-    # Circular walk 
+    reference = digit.clone()  # reference digit for distance calculations from original
+    print(f"[000] " f"exp={digit.expected_label} " f"conf={digit.confidence:.3f}")
+
+    # Circular walk
     noise_x = torch.randn_like(latent)  # Direzione X (fissa)
     noise_y = torch.randn_like(latent)  # Direzione Y (fissa)
-    
+
+    images = []
+    images.append(digit.image)
+
     # Iterative mutation process
     for step in range(1, max_steps + 1):
+        # DigitMutator(digit).mutate(prompt)
         DigitMutator(digit).mutate(prompt, step, noise_x, noise_y)
         prediction, confidence = Predictor.predict_single(reference, digit)
-        
+        images.append(digit.image)
+
         digit.predicted_label = prediction
         digit.confidence = confidence
         if digit.expected_label == digit.predicted_label:
@@ -87,14 +87,41 @@ def main(prompt, expected_label, max_steps=STEPS):
     ind = Individual(reference, digit)  # Create final individual to see results
     ind.misstep = step
     ind.export()
+    export_as_gif(
+        f"{Folder.DST}/individual_{Folder.run_id}.gif", images, rubber_band=True
+    )
+
+
+# Create a gif from all the images generated in the process
+def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
+    if rubber_band:
+        images += images[2:-1][::-1]
+    images[0].save(
+        filename,
+        save_all=True,
+        append_images=images[1:],
+        duration=1000 // frames_per_second,
+        loop=0,
+    )
 
 
 if __name__ == "__main__":
-    prompts =[ "A photo of Z0ero Number0","A photo of one1 Number1","A photo of two2 Number2 ","A photo of three3 Number3","A photo of Four4 Number4","A photo of Five5 Number5","A photo of Six6 Number6","A photo of Seven7 Number7 ","A photo of Eight8 Number8","A photo of Nine9 Number9"]
-    for i in range(0,2):
-        Folder.initialize() 
+    prompts = [
+        "A photo of Z0ero Number0",
+        "A photo of one1 Number1",
+        "A photo of two2 Number2 ",
+        "A photo of three3 Number3",
+        "A photo of Four4 Number4",
+        "A photo of Five5 Number5",
+        "A photo of Six6 Number6",
+        "A photo of Seven7 Number7 ",
+        "A photo of Eight8 Number8",
+        "A photo of Nine9 Number9",
+    ]
+    for i in range(0, 2):
+        Folder.initialize()
         randprompt = random.choice(prompts)
-        expected_label = int(re.search(r"Number(\d+)", randprompt).group(1)) 
+        expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
         main(prompt=randprompt, expected_label=expected_label)
         print("GAME OVER")
         TRYNEW = not TRYNEW

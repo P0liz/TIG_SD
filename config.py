@@ -1,16 +1,26 @@
 import torch
 
+# Timer
+RUNTIME = 3600
+
+# Evaluator
+K_SD = 0.1
+K = 1
+
+IMG_SIZE = 28
+
 STEPS = 100
 
 # Classifier
-CLASSIFIER_WEIGHTS_PATH = './mnist_classifier/weight/MNIST_conv_classifier.pth'
+CLASSIFIER_WEIGHTS_PATH = "./mnist_classifier/weight/MNIST_conv_classifier.pth"
 
-# Stable Diffusion 
+# Stable Diffusion
 MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 LORA_PATH = "./SD_weights"
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
-#DELTA = 0.05   # works when calculating delta with distance between latent vectors
-DELTA = 0.2     # need something bigger when calculating delta with confidence scores
+# DELTA = 0.05   # works when calculating delta with distance between latent vectors
+DELTA = 0.2  # need something bigger when calculating delta with confidence scores
+NOISE_SCALE = 0.025  # Circular walk
 
 # Torch settings
 if torch.cuda.is_available():

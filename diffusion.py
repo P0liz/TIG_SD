@@ -1,4 +1,4 @@
-""" 
+"""
 # Currently not used in TIG SD project
 # but might be useful for future reference (caching pipeline, diffusion process, etc.)
 import torch
@@ -100,7 +100,7 @@ def generate(prompt, seed=42, mutate='False',
              mutated_latent=None, num_inference_steps=40, guidance_scale=7.5, eta=0.0, width=512, height=512):
     '''
     create image by diffusion (for each digit)
-    returns: 
+    returns:
         cond_latent: latent space (1, 4, 64, 64)
         result img in numpy.ndarray shape:(512, 512, 3)
     '''

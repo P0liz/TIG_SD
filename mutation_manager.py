@@ -5,68 +5,76 @@ import torch
 import math
 
 from torchvision import transforms
-from config import DEVICE, MODEL_ID_PATH, LORA_PATH, LORA_WEIGHTS, DTYPE, VARIANT, TRYNEW, STEPS
+from config import (
+    DEVICE,
+    MODEL_ID_PATH,
+    LORA_PATH,
+    LORA_WEIGHTS,
+    DTYPE,
+    VARIANT,
+    TRYNEW,
+    STEPS,
+    NOISE_SCALE,
+)
 from diffusers import StableDiffusionPipeline
 from diffusers.schedulers import DDIMScheduler
 
 # Extras
-#import keras_cv
+# import keras_cv
+
 
 # Using Stable diffusion pipeline
 class SDPipelineManager:
     """Singleton per gestire la pipeline Stable Diffusion"""
+
     _instance = None
     _pipe = None
     _initialized = False
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(SDPipelineManager, cls).__new__(cls)
         return cls._instance
-    
+
     def initialize(self, num_inference_steps=15):
         """Inizializza la pipeline solo la prima volta"""
         if self._initialized:
             print("✓ Using cached Stable Diffusion pipeline")
             return self._pipe
-        
+
         print("Loading Stable Diffusion pipeline...")
-        
+
         # Load pipeline
         self._pipe = StableDiffusionPipeline.from_pretrained(
-            MODEL_ID_PATH, 
-            variant=VARIANT,
-            torch_dtype=DTYPE,     
-            safety_checker=None
+            MODEL_ID_PATH, variant=VARIANT, torch_dtype=DTYPE, safety_checker=None
         ).to(DEVICE)
         print("Loaded Stable Diffusion model")
-        
+
         # Load LoRA weights
         self._pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
         print("Loaded LoRA weights")
-        
+
         # Configure scheduler (only once)
         self._pipe.scheduler = DDIMScheduler.from_config(
-            self._pipe.scheduler.config,
-            rescale_betas_zero_snr=True
+            self._pipe.scheduler.config, rescale_betas_zero_snr=True
         )
         print("Configured scheduler")
-        
+
         # Enable optimizations if on CUDA
         if DEVICE == "cuda:0":
             self._pipe.enable_attention_slicing()
             print("Enabled attention slicing")
-        
+
         self.num_inference_steps = num_inference_steps
         self._initialized = True
-        
+
         print("Pipeline ready for inference")
         return self._pipe
 
-        # Using diffusion library 
-        #cond_latent, image = diffusion.generate(prompt, mutate = mutate, mutated_latent = mutated_latent)
-        #return cond_latent, image 
-        
+        # Using diffusion library
+        # cond_latent, image = diffusion.generate(prompt, mutate = mutate, mutated_latent = mutated_latent)
+        # return cond_latent, image
+
         # Using KerasCV Stable Diffusion model
         # NOT ENOUGH MEMORY
         """
@@ -81,7 +89,7 @@ class SDPipelineManager:
 
         return mutated_latent, image
         """
-    
+
     def get_pipe(self):
         """Ottieni la pipeline (inizializza se necessario)"""
         if not self._initialized:
@@ -96,16 +104,16 @@ pipeline_manager = SDPipelineManager()
 def get_pipeline():
     """Funzione helper per ottenere la pipeline"""
     return pipeline_manager.get_pipe()
-    
+
 
 def mutate(z_orig, delta):
     """
     Muta il latent code aggiungendo rumore gaussiano
-    
+
     Args:
         z_orig: torch.Tensor - latent originale
         delta: float - intensità della perturbazione
-    
+
     Returns:
         z_mut: torch.Tensor - latent mutato
     """
@@ -113,11 +121,14 @@ def mutate(z_orig, delta):
     z_mut = z_orig + delta * epsilon
     return z_mut
 
+
 # TODO: testare questo e capire quale raggio usare
-def mutate_circular(z_orig, step, noise_x, noise_y, total_steps=STEPS, noise_scale=1.0):
+def mutate_circular(
+    z_orig, step, noise_x, noise_y, total_steps=STEPS, noise_scale=NOISE_SCALE
+):
     """
     Muta il latent seguendo un punto specifico del percorso circolare
-    
+
     Args:
         step: int - quale step del walk (0 a total_steps-1)
         total_steps: int - numero totale di step nel cerchio
@@ -126,35 +137,41 @@ def mutate_circular(z_orig, step, noise_x, noise_y, total_steps=STEPS, noise_sca
     t = (step / total_steps) * 2 * math.pi
     scale_x = math.cos(t)
     scale_y = math.sin(t)
-    
+
     z_mut = z_orig + noise_scale * (scale_x * noise_x + scale_y * noise_y)
-    
+
     return z_mut
+
 
 def generate(prompt, mutated_latent=None):
     """
     Genera un'immagine usando Stable Diffusion
-    
+
     Args:
         prompt: str - prompt testuale
         mutated_latent: torch.Tensor - latent code (opzionale)
-    
+
     Returns:
         mutated_latent: torch.Tensor - latent usato
         image_tensor: torch.Tensor - immagine preprocessata [1, 1, 28, 28]
+        image: PIL.Image - visual image
     """
     pipe = get_pipeline()
     with torch.inference_mode():
         image = pipe(
-            prompt=prompt, 
-            guidance_scale=3.5, 
-            num_inference_steps=pipeline_manager.num_inference_steps, 
-            latents=mutated_latent)["images"][0]
+            prompt=prompt,
+            guidance_scale=3.5,
+            num_inference_steps=pipeline_manager.num_inference_steps,
+            latents=mutated_latent,
+        )["images"][0]
+
     # preprocess image to 28x28 grayscale tensor
-    image_tensor = process_image(image).unsqueeze(0).to(DEVICE)  # Add batch dimension and move to device
-    return mutated_latent, image_tensor
-    
-    
+    image_tensor = (
+        process_image(image).unsqueeze(0).to(DEVICE)
+    )  # Add batch dimension and move to device
+    return mutated_latent, image_tensor, image
+
+
 def process_image(image):
     """
     Convert a 3-channel RGB PIL Image to grayscale, resize it to 28x28 pixels,

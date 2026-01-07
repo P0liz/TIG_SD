@@ -31,8 +31,8 @@ def dist_from_nearest_archived(ind, population, k):
                 neighbors.append(d)
 
     if len(neighbors) == 0:
-        assert (len(population) > 0)
-        assert (population[0].id == ind.id)
+        assert len(population) > 0
+        assert population[0].id == ind.id
         return -1.0
 
     neighbors.sort()
@@ -47,7 +47,7 @@ def dist_from_nearest_archived(ind, population, k):
 
 
 def evaluate_sparseness(ind, individuals):
-    N = (len(individuals))
+    N = len(individuals)
     # Sparseness is evaluated only if the archive is not empty
     # Otherwise the sparseness is 1
     if (N == 0) or (N == 1 and individuals[0] == ind):

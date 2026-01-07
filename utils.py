@@ -1,14 +1,14 @@
 from os import makedirs
 from os.path import exists, basename, join
-
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-
 from folder import Folder
 import numpy as np
+
 
 def get_distance(v1, v2):
     return np.linalg.norm(v1 - v2)
@@ -19,27 +19,39 @@ def print_archive(archive):
     if not exists(dst):
         makedirs(dst)
     for i, ind in enumerate(archive):
-        filename1 = join(dst, basename(
-            'archived_' + str(i) +
-            '_mem1_l_' + str(ind.m1.predicted_label) +
-            '_seed_' + str(ind.seed)))
-        plt.imsave(filename1, ind.m1.purified.reshape(28, 28),
-                   cmap=cm.gray,
-                   format='png')
+        filename1 = join(
+            dst,
+            basename(
+                "archived_"
+                + str(i)
+                + "_mem1_l_"
+                + str(ind.m1.predicted_label)
+                + "_seed_"
+                + str(ind.seed)
+            ),
+        )
+        plt.imsave(
+            filename1, ind.m1.purified.reshape(28, 28), cmap=cm.gray, format="png"
+        )
         np.save(filename1, ind.m1.purified)
-        assert (np.array_equal(ind.m1.purified,
-                               np.load(filename1 + '.npy')))
+        assert np.array_equal(ind.m1.purified, np.load(filename1 + ".npy"))
 
-        filename2 = join(dst, basename(
-            'archived_' + str(i) +
-            '_mem2_l_' + str(ind.m2.predicted_label) +
-            '_seed_' + str(ind.seed)))
-        plt.imsave(filename2, ind.m2.purified.reshape(28, 28),
-                   cmap=cm.gray,
-                   format='png')
+        filename2 = join(
+            dst,
+            basename(
+                "archived_"
+                + str(i)
+                + "_mem2_l_"
+                + str(ind.m2.predicted_label)
+                + "_seed_"
+                + str(ind.seed)
+            ),
+        )
+        plt.imsave(
+            filename2, ind.m2.purified.reshape(28, 28), cmap=cm.gray, format="png"
+        )
         np.save(filename2, ind.m2.purified)
-        assert (np.array_equal(ind.m2.purified,
-                               np.load(filename2 + '.npy')))
+        assert np.array_equal(ind.m2.purified, np.load(filename2 + ".npy"))
 
 
 def print_archive_experiment(archive):
@@ -49,6 +61,7 @@ def print_archive_experiment(archive):
         digit = ind.m2
         digit.export(ind.id)
         ind.export()
+
 
 """ Not used anymore
 # Useful function that shapes the input in the format accepted by the ML model.
