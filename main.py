@@ -9,7 +9,7 @@ from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 from mutation_manager import get_pipeline
-from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS
+from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS, NOISE_SCALE
 
 
 def main(prompt, expected_label, max_steps=STEPS):
@@ -25,7 +25,8 @@ def main(prompt, expected_label, max_steps=STEPS):
     digit = MnistMember(latent, expected_label)
 
     # Initial generation and validation
-    DigitMutator(digit).generate(prompt)
+    # Higher guidance_scale to assure the prompt is followed
+    DigitMutator(digit).generate(prompt, guidance_scale=10)
     prediction, confidence = Predictor.predict_single(digit, digit)
 
     # Initial assignment
@@ -56,8 +57,8 @@ def main(prompt, expected_label, max_steps=STEPS):
 
     # Iterative mutation process
     for step in range(1, max_steps + 1):
-        # DigitMutator(digit).mutate(prompt)
-        DigitMutator(digit).mutate(prompt, step, noise_x, noise_y)
+        DigitMutator(digit).mutate(prompt)
+        # DigitMutator(digit).mutate(prompt, step, noise_x, noise_y)
         prediction, confidence = Predictor.predict_single(reference, digit)
         images.append(digit.image)
 
@@ -68,12 +69,14 @@ def main(prompt, expected_label, max_steps=STEPS):
         else:
             digit.correctly_classified = False
 
-        dist = digit.cosine_similarity(reference)
+        cos_sim = digit.cosine_similarity(reference)
+        euc_dist = digit.image_distance(reference)
         print(
             f"[{step:03d}] "
             f"pred={digit.predicted_label} "
             f"conf={digit.confidence:.3f} "
-            f"dist={dist:.3f}"
+            f"cos_sim={cos_sim:.3f} "
+            f"euc_dist={euc_dist:.3f}"
         )
 
         if not digit.correctly_classified:
@@ -86,6 +89,9 @@ def main(prompt, expected_label, max_steps=STEPS):
 
     ind = Individual(reference, digit)  # Create final individual to see results
     ind.misstep = step
+    ind.misclass = digit.predicted_label
+    ind.members_img_euc_dist = euc_dist
+    ind.members_latent_cos_sim = cos_sim
     ind.export()
     export_as_gif(
         f"{Folder.DST}/individual_{Folder.run_id}.gif", images, rubber_band=True
@@ -118,12 +124,11 @@ if __name__ == "__main__":
         "A photo of Eight8 Number8",
         "A photo of Nine9 Number9",
     ]
-    for i in range(0, 2):
+    for i in range(0, 5):
         Folder.initialize()
         randprompt = random.choice(prompts)
         expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
         main(prompt=randprompt, expected_label=expected_label)
         print("GAME OVER")
-        TRYNEW = not TRYNEW
 
 # source ./venv/bin/activate

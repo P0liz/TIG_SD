@@ -60,11 +60,6 @@ class SDPipelineManager:
         )
         print("Configured scheduler")
 
-        # Enable optimizations if on CUDA
-        if DEVICE == "cuda:0":
-            self._pipe.enable_attention_slicing()
-            print("Enabled attention slicing")
-
         self.num_inference_steps = num_inference_steps
         self._initialized = True
 
@@ -143,7 +138,7 @@ def mutate_circular(
     return z_mut
 
 
-def generate(prompt, mutated_latent=None):
+def generate(prompt, mutated_latent=None, guidance_scale=3.5):
     """
     Genera un'immagine usando Stable Diffusion
 
@@ -160,7 +155,7 @@ def generate(prompt, mutated_latent=None):
     with torch.inference_mode():
         image = pipe(
             prompt=prompt,
-            guidance_scale=3.5,
+            guidance_scale=guidance_scale,
             num_inference_steps=pipeline_manager.num_inference_steps,
             latents=mutated_latent,
         )["images"][0]

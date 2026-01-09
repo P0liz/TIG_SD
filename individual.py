@@ -21,6 +21,8 @@ class Individual:
         self.id = Individual.COUNT
         self.seed = None
         self.members_distance = None
+        self.members_img_euc_dist = None
+        self.members_latent_cos_sim = None
         self.sparseness = None
         self.misclass = None
         self.aggregate_ff = None
@@ -29,6 +31,7 @@ class Individual:
         self.m2 = member2
         self.misstep = 0
 
+    # TODO: readapt
     def reset(self):
         self.id = Individual.COUNT
         self.members_distance = None
@@ -41,12 +44,11 @@ class Individual:
     def to_dict(self):
         return {
             "id": str(self.id),
-            "seed": str(self.seed),
             "expected_label": str(self.m1.expected_label),
-            "m1": str(self.m1.predicted_label),
-            "m2": str(self.m2.predicted_label),
-            "m2_confidence": str(self.m2.confidence),
+            "misclass": str(self.misclass),
             "steps": str(self.misstep),
+            "members_img_euc_dist": str(self.members_img_euc_dist),
+            "members_latent_cos_sim": str(self.members_latent_cos_sim),
         }
 
     def export(self):
@@ -59,7 +61,7 @@ class Individual:
         # Save metadata
         filedest = join(ind_dir, "data.json")
         with open(filedest, "w") as f:
-            json.dump(self.to_dict(), f, sort_keys=True, indent=4)
+            json.dump(self.to_dict(), f, sort_keys=False, indent=4)
 
         # --- Helper to save a member ---
         def save_member(member, idx):

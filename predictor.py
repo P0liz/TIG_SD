@@ -28,9 +28,9 @@ class Predictor:
         # 1) was just applying softmax to the logits and getting the higher one
 
         # 2) margin between top logits as confidence score
-        label = np.argmax(new_logits)
-        confidence = simple_confidence_margin(new_logits)
-        # confidence, label = confidence_margin(new_logits, ref.expected_label)
+        # label = np.argmax(new_logits)
+        # confidence = simple_confidence_margin(new_logits)
+        confidence, label = confidence_margin(new_logits, ref.expected_label)
 
         # 3) Using distance in latent space as confidence measure
         # confidence = torch.linalg.norm(dig.latent - ref.latent).item()
