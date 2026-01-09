@@ -1,5 +1,6 @@
 from PIL import Image
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
@@ -58,6 +59,10 @@ def plot_distance(distances, save_path, title):
     Args:
         distances (list): List of distances.
     """
+    for i in range(len(distances)):
+        if not isinstance(distances[i], np.ndarray):
+            distances[i] = distances[i].numpy()
+
     # Create figure and axes
     fig, ax = plt.subplots(figsize=(10, 5))
 

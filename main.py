@@ -25,7 +25,7 @@ def main(prompt, expected_label, max_steps=STEPS):
     digit1 = MnistMember(latent, expected_label)
 
     # Initial generation and validation
-    # Higher guidance_scale to assure the prompt is followed
+    # Higher guidance_scale to assure the prompt is followed correctly
     DigitMutator(digit1).generate(prompt, guidance_scale=3.5)
     prediction, confidence = Predictor.predict_single(digit1, expected_label)
 
@@ -53,9 +53,7 @@ def main(prompt, expected_label, max_steps=STEPS):
     noise_y = torch.randn_like(latent)  # Direzione Y (fissa)
 
     images = []
-    images.append(digit1.image)
     conficence_scores = []
-    conficence_scores.append(digit1.confidence)
     euc_img_dists = []
     euc_img_dists.append(0)
     latent_cos_sims = []
@@ -64,20 +62,21 @@ def main(prompt, expected_label, max_steps=STEPS):
     # Iterative mutation process
     for step in range(1, max_steps + 1):
         # Chose digit with lower confidence score (cause we want to change the digit's prediction)
-        if digit1.confidence < digit2.confidence:
-            best_digit = digit2
-            other_digit = digit1
-        else:
+        if digit1.confidence <= digit2.confidence:
             best_digit = digit1
             other_digit = digit2
+        else:
+            best_digit = digit2
+            other_digit = digit1
+
+        # After selecting best and before mutating, save values to draw/plot
+        images.append(best_digit.image)
+        conficence_scores.append(best_digit.confidence)
 
         DigitMutator(best_digit).mutate(prompt)
         # DigitMutator(digit).mutate(prompt, step, noise_x, noise_y)    # Circular walk
         prediction, confidence = Predictor.predict_single(best_digit, expected_label)
-        images.append(best_digit.image)
-        conficence_scores.append(best_digit.confidence)
 
-        # TODO: plot confidence
         best_digit.predicted_label = prediction
         best_digit.confidence = confidence
         if best_digit.expected_label == best_digit.predicted_label:
@@ -85,7 +84,6 @@ def main(prompt, expected_label, max_steps=STEPS):
         else:
             best_digit.correctly_classified = False
 
-        # TODO: plot distance
         cos_sim = best_digit.cosine_similarity(other_digit)
         latent_cos_sims.append(cos_sim)
         euc_dist = best_digit.image_distance(other_digit)
@@ -117,8 +115,16 @@ def main(prompt, expected_label, max_steps=STEPS):
         f"{base_path}/individual_{Folder.run_id}.gif", images, rubber_band=True
     )
     plot_confidence(conficence_scores, f"{base_path}/confidence_{Folder.run_id}.png")
-    plot_distance(euc_img_dists, f"{base_path}/distance_{Folder.run_id}.png")
-    plot_distance(latent_cos_sims, f"{base_path}/cosine_similarity_{Folder.run_id}.png")
+    plot_distance(
+        euc_img_dists,
+        f"{base_path}/euclidean_distance_{Folder.run_id}.png",
+        "Euclidean distance",
+    )
+    plot_distance(
+        latent_cos_sims,
+        f"{base_path}/cosine_similarity_{Folder.run_id}.png",
+        "Cosine similarity",
+    )
 
 
 if __name__ == "__main__":
