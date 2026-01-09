@@ -1,7 +1,6 @@
 import torch
 import random
 import re
-from PIL import Image
 
 from folder import Folder
 from individual import Individual
@@ -9,7 +8,8 @@ from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 from mutation_manager import get_pipeline
-from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS, NOISE_SCALE
+from data_visualization import export_as_gif, plot_confidence, plot_distance
+from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS
 
 
 def main(prompt, expected_label, max_steps=STEPS):
@@ -20,95 +20,105 @@ def main(prompt, expected_label, max_steps=STEPS):
         dtype=DTYPE,
     )
     # Scala il latent secondo lo scheduler
-    latent = latent * get_pipeline().scheduler.init_noise_sigma
+    # latent = latent * get_pipeline().scheduler.init_noise_sigma
 
-    digit = MnistMember(latent, expected_label)
+    digit1 = MnistMember(latent, expected_label)
 
     # Initial generation and validation
     # Higher guidance_scale to assure the prompt is followed
-    DigitMutator(digit).generate(prompt, guidance_scale=10)
-    prediction, confidence = Predictor.predict_single(digit, digit)
+    DigitMutator(digit1).generate(prompt, guidance_scale=3.5)
+    prediction, confidence = Predictor.predict_single(digit1, expected_label)
 
     # Initial assignment
-    digit.predicted_label = prediction
-    digit.confidence = confidence
-    if digit.expected_label == digit.predicted_label:
-        digit.correctly_classified = True
+    digit1.predicted_label = prediction
+    digit1.confidence = confidence
+    if digit1.expected_label == digit1.predicted_label:
+        digit1.correctly_classified = True
     else:
-        digit.correctly_classified = False
+        digit1.correctly_classified = False
 
-    if not digit.correctly_classified:
+    if not digit1.correctly_classified:
         print(prompt, " - exp: ", expected_label)
-        print(f"pred={digit.predicted_label} " f"exp={digit.expected_label}")
-        ind = Individual(digit, digit)
+        print(f"pred={digit1.predicted_label} " f"exp={digit1.expected_label}")
+        ind = Individual(digit1, digit1)
         ind.export()
         print("Initial latent does not satisfy the label")
         return
 
-    reference = digit.clone()  # reference digit for distance calculations from original
-    print(f"[000] " f"exp={digit.expected_label} " f"conf={digit.confidence:.3f}")
+    print(f"[000] " f"exp={digit1.expected_label} " f"conf={digit1.confidence:.3f}")
+    digit2 = digit1.clone()  # second member of an Individual
 
     # Circular walk
     noise_x = torch.randn_like(latent)  # Direzione X (fissa)
     noise_y = torch.randn_like(latent)  # Direzione Y (fissa)
 
     images = []
-    images.append(digit.image)
+    images.append(digit1.image)
+    conficence_scores = []
+    conficence_scores.append(digit1.confidence)
+    euc_img_dists = []
+    euc_img_dists.append(0)
+    latent_cos_sims = []
+    latent_cos_sims.append(0)
 
     # Iterative mutation process
     for step in range(1, max_steps + 1):
-        DigitMutator(digit).mutate(prompt)
-        # DigitMutator(digit).mutate(prompt, step, noise_x, noise_y)
-        prediction, confidence = Predictor.predict_single(reference, digit)
-        images.append(digit.image)
-
-        digit.predicted_label = prediction
-        digit.confidence = confidence
-        if digit.expected_label == digit.predicted_label:
-            digit.correctly_classified = True
+        # Chose digit with lower confidence score (cause we want to change the digit's prediction)
+        if digit1.confidence < digit2.confidence:
+            best_digit = digit2
+            other_digit = digit1
         else:
-            digit.correctly_classified = False
+            best_digit = digit1
+            other_digit = digit2
 
-        cos_sim = digit.cosine_similarity(reference)
-        euc_dist = digit.image_distance(reference)
+        DigitMutator(best_digit).mutate(prompt)
+        # DigitMutator(digit).mutate(prompt, step, noise_x, noise_y)    # Circular walk
+        prediction, confidence = Predictor.predict_single(best_digit, expected_label)
+        images.append(best_digit.image)
+        conficence_scores.append(best_digit.confidence)
+
+        # TODO: plot confidence
+        best_digit.predicted_label = prediction
+        best_digit.confidence = confidence
+        if best_digit.expected_label == best_digit.predicted_label:
+            best_digit.correctly_classified = True
+        else:
+            best_digit.correctly_classified = False
+
+        # TODO: plot distance
+        cos_sim = best_digit.cosine_similarity(other_digit)
+        latent_cos_sims.append(cos_sim)
+        euc_dist = best_digit.image_distance(other_digit)
+        euc_img_dists.append(euc_dist)
         print(
             f"[{step:03d}] "
-            f"pred={digit.predicted_label} "
-            f"conf={digit.confidence:.3f} "
+            f"pred={best_digit.predicted_label} "
+            f"conf={best_digit.confidence:.3f} "
             f"cos_sim={cos_sim:.3f} "
             f"euc_dist={euc_dist:.3f}"
         )
 
-        if not digit.correctly_classified:
+        if not best_digit.correctly_classified:
             print(
                 f" Label flipped at step {step} "
-                f"pred={digit.predicted_label} "
-                f"exp={digit.expected_label}"
+                f"pred={best_digit.predicted_label} "
+                f"exp={best_digit.expected_label}"
             )
             break
 
-    ind = Individual(reference, digit)  # Create final individual to see results
+    ind = Individual(digit1, digit2)  # Create final individual to see results
     ind.misstep = step
-    ind.misclass = digit.predicted_label
+    ind.misclass = best_digit.predicted_label
     ind.members_img_euc_dist = euc_dist
     ind.members_latent_cos_sim = cos_sim
     ind.export()
+    base_path = f"{Folder.DST}"
     export_as_gif(
-        f"{Folder.DST}/individual_{Folder.run_id}.gif", images, rubber_band=True
+        f"{base_path}/individual_{Folder.run_id}.gif", images, rubber_band=True
     )
-
-
-# Create a gif from all the images generated in the process
-def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
-    if rubber_band:
-        images += images[2:-1][::-1]
-    images[0].save(
-        filename,
-        save_all=True,
-        append_images=images[1:],
-        duration=1000 // frames_per_second,
-        loop=0,
-    )
+    plot_confidence(conficence_scores, f"{base_path}/confidence_{Folder.run_id}.png")
+    plot_distance(euc_img_dists, f"{base_path}/distance_{Folder.run_id}.png")
+    plot_distance(latent_cos_sims, f"{base_path}/cosine_similarity_{Folder.run_id}.png")
 
 
 if __name__ == "__main__":
@@ -130,5 +140,6 @@ if __name__ == "__main__":
         expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
         main(prompt=randprompt, expected_label=expected_label)
         print("GAME OVER")
+
 
 # source ./venv/bin/activate

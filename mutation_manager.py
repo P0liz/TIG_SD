@@ -138,7 +138,7 @@ def mutate_circular(
     return z_mut
 
 
-def generate(prompt, mutated_latent=None, guidance_scale=3.5):
+def generate(prompt, mutated_latent=None, guidance_scale=2.5):
     """
     Genera un'immagine usando Stable Diffusion
 
