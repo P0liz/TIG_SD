@@ -34,7 +34,7 @@ class Predictor:
 
         # 3) Using distance in latent space as confidence measure
         # confidence = torch.linalg.norm(dig.latent - ref.latent).item()
-        # normalized_conf = torch.sigmoid(-torch.tensor(confidence)).item()
+        # normalized_conf = torch.sigmoid(torch.tensor(confidence)).item()
         # label = np.argmax(new_logits)
         return label, confidence
 

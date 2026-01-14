@@ -1,10 +1,11 @@
 import torch
 
+
 class MnistMember:
     COUNT = 0
 
     def __init__(self, latent, expected_label):
-        #self.seed = seed
+        # self.seed = seed
         self.id = MnistMember.COUNT
         self.image = None
         # latent vector
@@ -33,5 +34,4 @@ class MnistMember:
         return torch.nn.functional.cosine_similarity(self_flat, other_flat).item()
 
     def image_distance(self, other):
-        return torch.linalg.norm(self.image_tensor - other.image_tensor)
-        
+        return torch.linalg.norm(self.image_tensor - other.image_tensor).item()
