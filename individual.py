@@ -15,11 +15,11 @@ from folder import Folder
 class Individual:
     # Global counter of all the individuals (it is increased each time an individual is created or mutated).
     COUNT = 0
-    SEEDS = set()
+    USED_LABELS = set()
 
     def __init__(self, member1, member2):
         self.id = Individual.COUNT
-        self.seed = None
+        self.prompt = None
         self.members_distance = None
         self.members_img_euc_dist = None
         self.members_latent_cos_sim = None
@@ -31,7 +31,7 @@ class Individual:
         self.m2 = member2
         self.misstep = 0
 
-    # TODO: readapt
+    # TODO: why would I need this?
     def reset(self):
         self.id = Individual.COUNT
         self.members_distance = None
@@ -40,13 +40,13 @@ class Individual:
         self.aggregate_ff = None
         self.archive_candidate = None
 
-    # TODO: possibly change with something useful
     def to_dict(self):
         return {
             "id": str(self.id),
             "expected_label": str(self.m1.expected_label),
             "misclass": str(self.misclass),
             "steps": str(self.misstep),
+            "members_distance": str(self.members_distance),
             "members_img_euc_dist": str(self.members_img_euc_dist),
             "members_latent_cos_sim": str(self.members_latent_cos_sim),
         }
@@ -84,7 +84,7 @@ class Individual:
         save_member(self.m1, idx=1)
         save_member(self.m2, idx=2)
 
-    """
+    """ old version
     def export(self):
         if not exists(Folder.DST_IND):
             makedirs(Folder.DST_IND)

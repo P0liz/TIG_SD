@@ -1,5 +1,19 @@
 import torch
 
+DJ_DEBUG = 1
+
+# Popolazione e generazioni
+POPSIZE = 20  # Ridotto rispetto al secondo codice (SD è costoso)
+NGEN = 50
+INITIALPOP = "random"  # O 'seeded' per esplorare tutte le label
+STEPSIZE = 10
+RESEEDUPPERBOUND = 3  # Reseeding moderato
+
+# Archive configuration
+ARCHIVE_THRESHOLD = 4.0
+REPORT_NAME = "stats.csv"
+STOP_CONDITION = "iter"  # O 'time'
+
 # Timer
 RUNTIME = 3600
 
@@ -7,12 +21,12 @@ RUNTIME = 3600
 K_SD = 0.1
 K = 1
 
-IMG_SIZE = 28
-
+# Iterations
 STEPS = 100
 
 # Classifier
 CLASSIFIER_WEIGHTS_PATH = "./mnist_classifier/weight/MNIST_conv_classifier.pth"
+IMG_SIZE = 28
 
 # Stable Diffusion
 MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
@@ -37,3 +51,4 @@ WIDTH = 512
 
 # Dev testing
 TRYNEW = False
+MUTATION_TYPE = "single"  # O 'dual'

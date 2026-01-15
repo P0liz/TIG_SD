@@ -1,208 +1,467 @@
-import torch
 import random
-import re
+import numpy as np
+import torch
+from deap import base, creator, tools
+from deap.tools.emo import selNSGA2
 
-from folder import Folder
-from individual import Individual
-from predictor import Predictor
-from digit_mutator import DigitMutator
+# NSGA-II fa:
+# 1. Non-dominated sorting (crea fronti di Pareto)
+# 2. Crowding distance (misura diversità)
+# 3. Seleziona: fronti migliori + individui più isolati
+
 from mnist_member import MnistMember
+from digit_mutator import DigitMutator
+from predictor import Predictor
+from timer import Timer
+import archive_manager
+from individual import Individual
 from mutation_manager import get_pipeline
-from data_visualization import export_as_gif, plot_confidence, plot_distance
-from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS
+from config import (
+    NGEN,
+    POPSIZE,
+    RESEEDUPPERBOUND,
+    STOP_CONDITION,
+    STEPSIZE,
+    DJ_DEBUG,
+    DEVICE,
+    HEIGHT,
+    WIDTH,
+    DTYPE,
+)
+
+PROMPTS = [
+    "A photo of Z0ero Number0",
+    "A photo of one1 Number1",
+    "A photo of two2 Number2",
+    "A photo of three3 Number3",
+    "A photo of Four4 Number4",
+    "A photo of Five5 Number5",
+    "A photo of Six6 Number6",
+    "A photo of Seven7 Number7",
+    "A photo of Eight8 Number8",
+    "A photo of Nine9 Number9",
+]
+
+pipe = get_pipeline()
+
+# DEAP framework setup.
+creator.create("FitnessMulti", base.Fitness, weights=(1.0, -1.0))
+creator.create("Individual", Individual, fitness=creator.FitnessMulti)
+
+# Global individual variables
+Individual.COUNT = 0
+Individual.USED_LABELS = set()
 
 
-# Mutate only the one with the lower confidence and keep the mutation only if it is better (lower)
-def single_mutation(prompt, digit1, digit2, images, confidence_scores):
-    # Chose digit with lower confidence score (cause we want to change the digit's prediction)
-    if digit1.confidence <= digit2.confidence:
-        selected_digit = digit1
-        other_digit = digit2
-    else:
-        selected_digit = digit2
-        other_digit = digit1
+class GeneticAlgorithm:
 
-    # Save data pre mutation
-    images.append(selected_digit.image)
-    confidence_scores.append(selected_digit.confidence)
-    pre_mutation_digit = selected_digit.clone()
+    def __init__(self, mutation_type="single", rand_seed=None):
+        self.mutation_type = mutation_type
+        self.archive = archive_manager.Archive()
 
-    DigitMutator(selected_digit).mutate(prompt)
-    # DigitMutator(digit).mutate(prompt, step, noise_x, noise_y)    # Circular walk
-    prediction, confidence = Predictor.predict_single(selected_digit, expected_label)
+        # Keep deterministic outputs
+        if rand_seed is not None:
+            random.seed(rand_seed)
+            torch.manual_seed(rand_seed)
 
-    # Revert mutation in case confidence gets higher
-    if confidence > pre_mutation_digit.confidence:
-        if selected_digit is digit1:
-            digit1 = pre_mutation_digit
-        else:
-            digit2 = pre_mutation_digit
+    # ========================================================================
+    # Generation
+    # ========================================================================
+
+    def generate_member(
+        self, prompt, expected_label, guidance_scale=3.5, max_attempts=10
+    ):
+        """
+        Generate a member with Stable Diffusion and Validate it if possible
+        Args:
+            prompt (_type_): _description_
+            expected_label (_type_): _description_
+            guidance_scale (float, optional): _description_. Defaults to 3.5.
+            max_attempts (int, optional): _description_. Defaults to 10.
+
+        Returns:
+            member ore None if failure
+        """
+        for i in range(max_attempts):
+            latent = torch.randn(
+                (1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
+                device=DEVICE,
+                dtype=DTYPE,
+            )
+
+            # Generate member and classify it
+            member = MnistMember(latent, expected_label)
+            DigitMutator(member).generate(prompt, guidance_scale=guidance_scale)
+            prediction, confidence = Predictor.predict_single(member, expected_label)
+
+            # Validation
+            if prediction == expected_label:
+                member.predicted_label = prediction
+                member.confidence = confidence
+                member.correctly_classified = True
+                return member
+            else:
+                continue
+
+        print(f"Failed to generate valid member for label {expected_label}")
         return None
 
-    return prediction, confidence, selected_digit, other_digit
+    def create_individual(self, label=None):
+        """
+        Args:
+            label (_type_, optional): _description_. Defaults to None.
 
+        Raises:
+            ValueError: _description_
 
-# Mutate both members and keep the one with the lower confidence (independently from the starting confidence)
-def dual_mutation(prompt, digit1, digit2, expected_label, images, confidence_scores):
-    # Save data pre mutation
-    pre_mutation_digit1 = digit1.clone()
-    pre_mutation_digit2 = digit2.clone()
+        Returns:
+            new basic individual, composed a couple of members
+        """
+        Individual.COUNT += 1
 
-    # Mutate both digits
-    DigitMutator(digit1).mutate(prompt)
-    DigitMutator(digit2).mutate(prompt)
+        if label is None:
+            label = random.randint(0, 9)
+        prompt = PROMPTS[label]
 
-    # Predict both digits
-    prediction1, confidence1 = Predictor.predict_single(digit1, expected_label)
-    prediction2, confidence2 = Predictor.predict_single(digit2, expected_label)
+        # Generate members
+        m1 = self.generate_member(prompt, label)
+        if m1 is None:
+            # Riprova con guidance più alta
+            m1 = self.generate_member(prompt, label, guidance_scale=5.0)
+            if m1 is None:
+                raise ValueError(f"Cannot create individual for label {label}")
 
-    # Keep only best mutation
-    # TODO: It might make sens to have 2 different gifs and graphs for each member in this case
-    if confidence1 < confidence2:
-        digit2 = pre_mutation_digit2
-        images.append(digit1.image)
-        confidence_scores.append(digit1.confidence)
-        return prediction1, confidence1, digit1, digit2
-    else:
-        digit1 = pre_mutation_digit1
-        images.append(digit2.image)
-        confidence_scores.append(digit2.confidence)
-        return prediction2, confidence2, digit2, digit1
+        m2 = m1.clone()
 
+        # Create individual
+        individual = creator.Individual(m1, m2)
+        individual.members_distance = 0
+        individual.members_img_euc_dist = 0
+        individual.members_latent_cos_sim = 1
+        individual.prompt = prompt
 
-def main(prompt, expected_label, max_steps=STEPS):
-    # Starting from a random latent noise vector
-    latent = torch.randn(
-        (1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
-        device=DEVICE,
-        dtype=DTYPE,
-    )
-    # Scala il latent secondo lo scheduler
-    # latent = latent * get_pipeline().scheduler.init_noise_sigma
+        Individual.USED_LABELS.add(label)
 
-    digit1 = MnistMember(latent, expected_label)
+        return individual
 
-    # Initial generation and validation
-    # Higher guidance_scale to assure the prompt is followed correctly
-    DigitMutator(digit1).generate(prompt, guidance_scale=3.5)
-    prediction, confidence = Predictor.predict_single(digit1, expected_label)
+    def create_population(self, size):
+        """
+        Args:
+            size (_type_): _description_
 
-    # Initial assignment
-    digit1.predicted_label = prediction
-    digit1.confidence = confidence
-    if digit1.expected_label == digit1.predicted_label:
-        digit1.correctly_classified = True
-    else:
-        digit1.correctly_classified = False
+        Returns:
+            create initial population of individuals
+        """
+        population = []
 
-    if not digit1.correctly_classified:
-        print(prompt, " - exp: ", expected_label)
-        print(f"pred={digit1.predicted_label} " f"exp={digit1.expected_label}")
-        ind = Individual(digit1, digit1)
-        ind.export()
-        print("Initial latent does not satisfy the label")
-        return
+        print(f"Creating initial population of {size} individuals...")
 
-    print(f"[000] " f"exp={digit1.expected_label} " f"conf={digit1.confidence:.3f}")
-    digit2 = digit1.clone()  # second member of an Individual
+        for i in range(size):
+            try:
+                # Use different labels
+                label = i % 10
+                ind = self.create_individual(label=label)
+                population.append(ind)
 
-    # Circular walk
-    noise_x = torch.randn_like(latent)  # Direzione X (fissa)
-    noise_y = torch.randn_like(latent)  # Direzione Y (fissa)
+                print(
+                    f"  [{i+1}/{size}] label={ind.m1.expected_label}, "
+                    f"conf={ind.m1.confidence:.3f}"
+                )
 
-    images = []
-    confidence_scores = []
-    euc_img_dists = []
-    euc_img_dists.append(0)
-    latent_cos_sims = []
-    latent_cos_sims.append(0)
-
-    # Iterative mutation process
-    for step in range(1, max_steps + 1):
-
-        if TRYNEW:
-            prediction, confidence, selected_digit, other_digit = dual_mutation(
-                prompt, digit1, digit2, expected_label, images, confidence_scores
-            )
-        else:
-            result = single_mutation(
-                prompt, digit1, digit2, expected_label, images, confidence_scores
-            )
-            if result is None:
+            except ValueError as e:
+                print(f"  ✗ Failed to create individual {i+1}: {e}")
                 continue
-            prediction, confidence, selected_digit, other_digit = result
 
-        selected_digit.predicted_label = prediction
-        selected_digit.confidence = confidence
-        if selected_digit.expected_label == selected_digit.predicted_label:
-            selected_digit.correctly_classified = True
+        return population
+
+    # ========================================================================
+    # Mutation
+    # ========================================================================
+
+    # Mutate only the one with the lower confidence and keep the mutation only if it is better (lower)
+    def mutate_single(self, individual):
+        # Chose digit with lower confidence score (cause we want to change the digit's prediction
+        if individual.m1.confidence <= individual.m2.confidence:
+            digit_to_mutate = individual.m1
+            other_digit = individual.m2
+            is_m1 = True
         else:
-            selected_digit.correctly_classified = False
+            digit_to_mutate = individual.m2
+            other_digit = individual.m1
+            is_m1 = False
 
-        cos_sim = selected_digit.cosine_similarity(other_digit)
-        latent_cos_sims.append(cos_sim)
-        euc_dist = selected_digit.image_distance(other_digit)
-        euc_img_dists.append(euc_dist)
-        print(
-            f"[{step:03d}] "
-            f"pred={selected_digit.predicted_label} "
-            f"conf={selected_digit.confidence:.3f} "
-            f"cos_sim={cos_sim:.3f} "
-            f"euc_dist={euc_dist:.3f}"
+        # Backup
+        backup = digit_to_mutate.clone()
+        # TODO: add plotting
+
+        # Mutate and predict
+        prompt = PROMPTS[digit_to_mutate.expected_label]
+        DigitMutator(digit_to_mutate).mutate(prompt)
+        prediction, new_confidence = Predictor.predict_single(
+            digit_to_mutate, digit_to_mutate.expected_label
         )
 
-        if not selected_digit.correctly_classified:
-            print(
-                f" Label flipped at step {step} "
-                f"pred={selected_digit.predicted_label} "
-                f"exp={selected_digit.expected_label}"
+        # Revert mutation in case confidence gets higher
+        if new_confidence < backup.confidence:
+            digit_to_mutate.predicted_label = prediction
+            digit_to_mutate.confidence = new_confidence
+            digit_to_mutate.correctly_classified = (
+                prediction == digit_to_mutate.expected_label
             )
-            break
 
-    ind = Individual(digit1, digit2)  # Create final individual to see results
-    ind.misstep = step
-    ind.misclass = selected_digit.predicted_label
-    ind.members_img_euc_dist = euc_dist
-    ind.members_latent_cos_sim = cos_sim
-    ind.export()
-    base_path = f"{Folder.DST}"
-    export_as_gif(
-        f"{base_path}/individual_{Folder.run_id}.gif", images, rubber_band=True
-    )
-    plot_confidence(confidence_scores, f"{base_path}/confidence_{Folder.run_id}.png")
-    plot_distance(
-        euc_img_dists,
-        f"{base_path}/euclidean_distance_{Folder.run_id}.png",
-        "Euclidean distance",
-    )
-    plot_distance(
-        latent_cos_sims,
-        f"{base_path}/cosine_similarity_{Folder.run_id}.png",
-        "Cosine similarity",
-    )
+            # Update distances
+            individual.members_distance = digit_to_mutate.distance(other_digit)
+            individual.members_img_euc_dist = digit_to_mutate.image_distance(
+                other_digit
+            )
+            individual.members_latent_cos_sim = digit_to_mutate.cosine_similarity(
+                other_digit
+            )
+        else:
+            if is_m1:
+                individual.m1 = backup
+            else:
+                individual.m2 = backup
 
+    # Mutate both members and keep the one with the lower confidence (independently from the starting confidence)
+    def mutate_dual(self, individual):
+        # Backup
+        backup_m1 = individual.m1.clone()
+        backup_m2 = individual.m2.clone()
+
+        # Mutate and predict
+        prompt1 = PROMPTS[individual.m1.expected_label]
+        prompt2 = PROMPTS[individual.m2.expected_label]
+        DigitMutator(individual.m1).mutate(prompt1)
+        DigitMutator(individual.m2).mutate(prompt2)
+        pred1, conf1 = Predictor.predict_single(
+            individual.m1, individual.m1.expected_label
+        )
+        pred2, conf2 = Predictor.predict_single(
+            individual.m2, individual.m2.expected_label
+        )
+
+        # Keep only best mutation
+        # TODO: It might make sens to have 2 different gifs and graphs for each member in this case
+        if conf1 < conf2:
+            individual.m2 = backup_m2
+            individual.m1.predicted_label = pred1
+            individual.m1.confidence = conf1
+            individual.m1.correctly_classified = pred1 == individual.m1.expected_label
+        else:
+            individual.m1 = backup_m1
+            individual.m2.predicted_label = pred2
+            individual.m2.confidence = conf2
+            individual.m2.correctly_classified = pred2 == individual.m2.expected_label
+
+        # Update distances
+        individual.members_distance = individual.m1.distance(individual.m2)
+        individual.members_img_euc_dist = individual.m1.image_distance(individual.m2)
+        individual.members_latent_cos_sim = individual.m1.cosine_similarity(
+            individual.m2
+        )
+
+    # Switch type of mutation
+    # it was better to put this in the digit mutator but it's fine since it is temporary
+    def mutate(self, individual):
+        if self.mutation_type == "single":
+            self.mutate_single(individual)
+        else:
+            self.mutate_dual(individual)
+
+    # ========================================================================
+    # Evaluation
+    # ========================================================================
+
+    def evaluate_batch(self, individuals):
+        """
+        Evaluate a batch of individuals.
+        Args:
+            individuals (_type_): _description_
+        """
+        members_to_predict = []
+
+        for ind in individuals:
+            if ind.m1.predicted_label is None:
+                members_to_predict.append(ind.m1)
+            if ind.m2.predicted_label is None:
+                members_to_predict.append(ind.m2)
+        if len(members_to_predict) == 0:
+            return
+        batch_labels = [m.expected_label for m in members_to_predict]
+
+        predictions, confidences = Predictor.predict_single(
+            members_to_predict, batch_labels
+        )
+
+        # Assign results
+        for member, pred, conf in zip(members_to_predict, predictions, confidences):
+            member.predicted_label = pred
+            member.confidence = conf
+            member.correctly_classified = member.expected_label == pred
+
+    def evaluate_fitness(self, individuals):
+        for ind in individuals:
+            ind.evaluate(self.archive.get_archive())
+            ind.fitness.values = (ind.aggregate_ff, ind.misclass)
+
+    def clone_individual(self, individual):
+        # Clone an individual (deep copy)
+        # Use the new constructor to include the fitness field
+        new_ind = creator.Individual(individual.m1.clone(), individual.m2.clone())
+        new_ind.members_distance = individual.members_distance
+        new_ind.prompt = individual.prompt
+        return new_ind
+
+    # TODO: See later
+    def reseed_population(self, population, n_reseed):
+        """
+        Sostituisce gli individui peggiori con nuovi individui
+        usando label non ancora esplorate.
+        """
+        if n_reseed == 0:
+            return population
+
+        # Trova label non usate
+        all_labels = set(range(10))
+        unused_labels = all_labels - Individual.USED_LABELS
+
+        # Sostituisci gli ultimi n_reseed (i peggiori dopo selezione)
+        for i in range(n_reseed):
+            idx = len(population) - 1 - i
+
+            if len(unused_labels) > 0:
+                new_label = random.choice(list(unused_labels))
+                unused_labels.remove(new_label)
+            else:
+                new_label = random.randint(0, 9)
+
+            try:
+                population[idx] = self.create_individual(label=new_label)
+                print(f"Reseeded individual {idx} with label {new_label}")
+            except ValueError:
+                print(f"Failed to reseed individual {idx}")
+
+        return population
+
+    def update_archive(self, individuals):
+        for ind in individuals:
+            if ind.archive_candidate:
+                self.archive.update_archive(ind)
+
+    # ========================================================================
+    # Run
+    # ========================================================================
+
+    def run(self):
+        # Stats
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats.register("min", np.min, axis=0)
+        stats.register("max", np.max, axis=0)
+        stats.register("avg", np.mean, axis=0)
+        logbook = tools.Logbook()
+        logbook.header = "gen", "evals", "min", "max", "avg"
+
+        print("Generating initial population")
+        population = self.create_population(POPSIZE)
+        if len(population) < POPSIZE:
+            print(f"Warning: only {len(population)}/{POPSIZE} individuals created")
+
+        # Initial evaluation
+        self.evaluate_batch(population)
+        self.evaluate_fitness(population)
+        self.update_archive(population)
+        # This is just to assign the crowding distance to the individuals (no actual selection is done)
+        population = selNSGA2(population, len(population))
+
+        record = stats.compile(population)
+        logbook.record(gen=0, evals=len(population), **record)
+        print(f"Gen 0: {logbook.stream}")
+
+        # Begin the generational process
+        gen = 1
+        while gen <= NGEN:
+            print(f"### GENERATION {gen}")
+
+            # 1. Select future parents
+            offspring = tools.selTournamentDCD(population, len(population))
+            offspring = [self.clone_individual(ind) for ind in offspring]
+
+            # 2. Reseeding (optional)
+            # See later cause I have to understand if it makes sense,
+            # and if it does, is it better to keep or delete duplicates?
+            """
+            if len(self.archive.get_archive()) > 0 and gen % 10 == 0:
+                n_reseed = random.randint(
+                    1, min(RESEEDUPPERBOUND, len(population) // 4)
+                )
+                population = self.reseed_population(population, n_reseed)
+            """
+
+            # 3. Mutation
+            print(f"Mutating {len(offspring)} offspring...")
+            for ind in offspring:
+                self.mutate(ind)
+                del ind.fitness.values
+
+            # 4. Evaluation
+            all_individuals = population + offspring
+            self.evaluate_batch(all_individuals)
+            self.evaluate_fitness(all_individuals)
+            self.update_archive(all_individuals)
+
+            # 5. Survival selection (NSGA-II)
+            # Using len(population) because it could differ from POPSIZE (in case of reseeding)
+            population = selNSGA2(all_individuals, len(population))
+            print(f"Survived: {len(population)} individuals")
+
+            # 6. Statistiche
+            record = stats.compile(population)
+            logbook.record(gen=gen, evals=len(all_individuals), **record)
+            print(f"Gen {gen}: {logbook.stream}")
+
+            # 7. Debug report
+            if DJ_DEBUG and gen % STEPSIZE == 0:
+                self.archive.create_report(Individual.USED_LABELS, gen)
+
+            gen += 1
+
+            # Stop condition
+            if STOP_CONDITION == "time" and not Timer.has_budget():
+                print("Time budget exhausted")
+                break
+
+        # Ending process
+        self.archive.create_report(Individual.USED_LABELS, "final")
+
+        print(f"Final statistics:")
+        print(f"Individuals created: {Individual.COUNT}")
+        print(f"Labels explored: {Individual.USED_LABELS}")
+        print(f"Archive size: {len(self.archive.get_archive())}")
+        print(f"Final population: {len(population)}")
+
+        return population, self.archive
+
+
+# ============================================================================
+# Main
+# ============================================================================
 
 if __name__ == "__main__":
-    prompts = [
-        "A photo of Z0ero Number0",
-        "A photo of one1 Number1",
-        "A photo of two2 Number2 ",
-        "A photo of three3 Number3",
-        "A photo of Four4 Number4",
-        "A photo of Five5 Number5",
-        "A photo of Six6 Number6",
-        "A photo of Seven7 Number7 ",
-        "A photo of Eight8 Number8",
-        "A photo of Nine9 Number9",
-    ]
-    for i in range(0, 4):
-        if i >= 2:
-            TRYNEW = True
-        Folder.initialize()
-        randprompt = random.choice(prompts)
-        expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
-        main(prompt=randprompt, expected_label=expected_label)
-        print("GAME OVER")
+    from folder import Folder
 
+    Folder.initialize()
 
-# source ./venv/bin/activate
+    # Crea e esegui GA
+    ga = GeneticAlgorithm(mutation_type="single", rand_seed=42)
+    population, archive = ga.run()
+
+    # Report finale
+    print("\n### FINAL ARCHIVE")
+    from utils import print_archive, print_archive_experiment
+
+    # TODO: why both???
+    print_archive_experiment(archive.get_archive())
+    print_archive(archive.get_archive())
+
+    print("GAME OVER")

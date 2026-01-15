@@ -7,7 +7,12 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 from folder import Folder
+from config import IMG_SIZE
 import numpy as np
+import torch
+
+# TODO: converto to use torch tensors instead of numpy arrays
+# or remember to always convert to numpy arrays
 
 
 def get_distance(v1, v2):
@@ -31,7 +36,10 @@ def print_archive(archive):
             ),
         )
         plt.imsave(
-            filename1, ind.m1.purified.reshape(28, 28), cmap=cm.gray, format="png"
+            filename1,
+            ind.m1.purified.reshape(IMG_SIZE, IMG_SIZE),
+            cmap=cm.gray,
+            format="png",
         )
         np.save(filename1, ind.m1.purified)
         assert np.array_equal(ind.m1.purified, np.load(filename1 + ".npy"))
@@ -48,12 +56,16 @@ def print_archive(archive):
             ),
         )
         plt.imsave(
-            filename2, ind.m2.purified.reshape(28, 28), cmap=cm.gray, format="png"
+            filename2,
+            ind.m2.purified.reshape(IMG_SIZE, IMG_SIZE),
+            cmap=cm.gray,
+            format="png",
         )
         np.save(filename2, ind.m2.purified)
         assert np.array_equal(ind.m2.purified, np.load(filename2 + ".npy"))
 
 
+# TODO: understand why there is this and the previous one used both
 def print_archive_experiment(archive):
     for i, ind in enumerate(archive):
         digit = ind.m1
@@ -63,27 +75,52 @@ def print_archive_experiment(archive):
         ind.export()
 
 
-""" Not used anymore
+def get_mindist_seed(solution, dataset):
+    # Calculate the distance between each misclassified digit and the seed (mindist metric)
+    min_distances = list()
+    for ind in solution:
+        # get seed
+        seed = reshape(dataset[int(ind.seed)])
+
+        # get misclassified member
+        if ind.m1.predicted_label != ind.m1.expected_label:
+            misclassified_member = ind.m1.purified
+        else:
+            misclassified_member = ind.m2.purified
+        dist = np.linalg.norm(misclassified_member - seed)
+        min_distances.append(dist)
+    mindist = np.mean(min_distances)
+    return mindist
+
+
+def get_radius_reference(solution, reference):
+    # Calculate the distance between each misclassified digit and the seed (mindist metric)
+    min_distances = list()
+    for sol in solution:
+        digit = sol.purified
+        dist = np.linalg.norm(digit - reference)
+        min_distances.append(dist)
+    mindist = np.mean(min_distances)
+    return mindist
+
+
+def get_diameter(solution):
+    # Calculate the distance between each misclassified digit and the farthest element of the solution (diameter metric)
+    max_distances = list()
+    for d1 in solution:
+        maxdist = float(0)
+        for d2 in solution:
+            if d1 != d2:
+                dist = np.linalg.norm(d1.purified - d2.purified)
+                if dist > maxdist:
+                    maxdist = dist
+        max_distances.append(maxdist)
+    diameter = np.mean(max_distances)
+    return diameter
+
+
 # Useful function that shapes the input in the format accepted by the ML model.
 def reshape(v):
-    v = (np.expand_dims(v, 0))
-    # Shape numpy vectors
-    if keras.backend.image_data_format() == 'channels_first':
-        v = v.reshape(v.shape[0], 1, IMG_SIZE, IMG_SIZE)
-    else:
-        v = v.reshape(v.shape[0], IMG_SIZE, IMG_SIZE, 1)
-    v = v.astype('float32')
-    v = v / 255.0
-    return v
-
-
-def input_reshape(x):
-    # shape numpy vectors
-    if keras.backend.image_data_format() == 'channels_first':
-        x_reshape = x.reshape(x.shape[0], 1, 28, 28)
-    else:
-        x_reshape = x.reshape(x.shape[0], 28, 28, 1)
-    x_reshape = x_reshape.astype('float32')
-    x_reshape /= 255.0
-    return x_reshape
-"""
+    if isinstance(v, np.ndarray):
+        v = torch.from_numpy(v)
+    return v.unsqueeze(0).reshape(1, 1, IMG_SIZE, IMG_SIZE).float() / 255.0
