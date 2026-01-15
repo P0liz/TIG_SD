@@ -7,6 +7,7 @@ from timer import Timer
 from utils import get_distance, get_diameter, get_radius_reference
 from evaluator import eval_archive_dist
 import numpy as np
+import torch
 
 from config import (
     ARCHIVE_THRESHOLD,
@@ -15,7 +16,6 @@ from config import (
     RESEEDUPPERBOUND,
     K_SD,
     CLASSIFIER_WEIGHTS_PATH,
-    EXPLABEL,
     STOP_CONDITION,
     RUNTIME,
     REPORT_NAME,
@@ -27,7 +27,7 @@ class Archive:
 
     def __init__(self):
         self.archive = list()
-        self.archived_seeds = set()
+        self.archived_labels = set()
 
     def get_archive(self):
         return self.archive
@@ -36,7 +36,7 @@ class Archive:
         if ind not in self.archive:
             if len(self.archive) == 0:
                 self.archive.append(ind)
-                self.archived_seeds.add(ind.seed)
+                self.archived_labels.add(ind.prompt)
             else:
                 # Find the member of the archive that is closest to the candidate.
                 closest_archived = None
@@ -55,28 +55,19 @@ class Archive:
                     # The candidate replaces the closest archive member if its members' distance is better
                     dist_ind = ind.members_distance
                     dist_archived_ind = get_distance(
-                        closest_archived.m1.purified, closest_archived.m2.purified
+                        closest_archived.m1.image_tensor,
+                        closest_archived.m2.image_tensor,
                     )
                     if dist_ind <= dist_archived_ind:
                         self.archive.remove(closest_archived)
                         self.archive.append(ind)
-                        self.archived_seeds.add(ind.seed)
+                        self.archived_labels.add(ind.prompt)
                 else:
                     # Add the candidate to the archive if it is distant from all the other archive members
                     self.archive.append(ind)
-                    self.archived_seeds.add(ind.seed)
+                    self.archived_labels.add(ind.prompt)
 
-    def get_min_distance_from_archive(self, seed):
-        distances = list()
-        for archived_ind in self.archive:
-            dist_member1 = np.linalg.norm(archived_ind.m1.purified - seed)
-            dist_member2 = np.linalg.norm(archived_ind.m2.purified - seed)
-            avg_dist = (dist_member1 + dist_member2) / 2
-            distances.append(avg_dist)
-        min_dist = min(distances)
-        return min_dist
-
-    def create_report(self, seeds, generation):
+    def create_report(self, labels, generation):
         # Retrieve the solutions belonging to the archive.
         if generation == STEPSIZE:
             dst = join(Folder.DST, REPORT_NAME)
@@ -84,7 +75,7 @@ class Archive:
                 report_writer = csv.writer(
                     report_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
                 )
-
+                # TODO: rename stuff
                 report_writer.writerow(
                     [
                         "run",
@@ -132,7 +123,9 @@ class Archive:
                 sumdistances = 0
                 for dig2 in outer_frontier:
                     if dig1 != dig2:
-                        sumdistances += np.linalg.norm(dig1.purified - dig2.purified)
+                        sumdistances += torch.linalg.norm(
+                            dig1.image_tensor - dig2.image_tensor
+                        ).item()
                 dig1.sparseness = sumdistances / (n - 1)
                 sumsparseness += dig1.sparseness
             avg_sparseness = sumsparseness / n
@@ -146,14 +139,15 @@ class Archive:
         stats = [None] * 4
         final_seeds = []
         if len(solution) > 0:
-            reference_filename = "ref_digit/cinque_rp.npy"
-            reference = np.load(reference_filename)
+            # reference_filename = "ref_digit/cinque_rp.npy"
+            # reference = np.load(reference_filename)
             out_diameter = get_diameter(outer_frontier)
             in_diameter = get_diameter(inner_frontier)
             final_seeds = self.get_seeds()
             stats = self.get_dist_members()
-            out_radius_ref = get_radius_reference(outer_frontier, reference)
-            in_radius_ref = get_radius_reference(inner_frontier, reference)
+            # TODO: what for?
+            # out_radius_ref = get_radius_reference(outer_frontier, reference)
+            # in_radius_ref = get_radius_reference(inner_frontier, reference)
 
         if STOP_CONDITION == "iter":
             budget = NGEN
@@ -161,6 +155,7 @@ class Archive:
             budget = RUNTIME
         else:
             budget = "no budget"
+        # TODO: add stuff
         config = {
             "popsize": str(POPSIZE),
             "budget": str(budget),
@@ -192,27 +187,26 @@ class Archive:
                     str(elapsed_time),
                     str(n),
                     str(avg_sparseness),
-                    str(len(seeds)),
-                    str(len(self.archived_seeds)),
+                    str(len(labels)),
+                    str(len(self.archived_labels)),
                     str(len(final_seeds)),
                     str(stats[0]),
                     str(stats[1]),
                     str(stats[2]),
                     str(stats[3]),
-                    str(out_radius_ref),
-                    str(in_radius_ref),
-                    str(out_radius),
-                    str(in_radius),
+                    # str(out_radius_ref),
+                    # str(in_radius_ref),
+                    # str(out_radius),
+                    # str(in_radius),
                     str(out_diameter),
                     str(in_diameter),
-                    str(generation),
                 ]
             )
 
     def get_seeds(self):
         seeds = set()
         for ind in self.get_archive():
-            seeds.add(ind.seed)
+            seeds.add(ind.prompt)
         return seeds
 
     def get_dist_members(self):

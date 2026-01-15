@@ -58,38 +58,21 @@ def evaluate_sparseness(ind, individuals):
     return sparseness
 
 
-def eval_dist_individuals(ind1, ind2):
-
-    a1 = utils.get_distance(ind1.m1.purified, ind2.m1.purified)
-    a2 = utils.get_distance(ind1.m1.purified, ind2.m2.purified)
-
-    b1 = utils.get_distance(ind1.m2.purified, ind2.m1.purified)
-    b2 = utils.get_distance(ind1.m2.purified, ind2.m2.purified)
-
-    a = np.minimum(a1, a2)
-    b = np.minimum(b1, b2)
-    c = np.minimum(a1, b1)
-    d = np.minimum(a2, b2)
-
-    dist = np.mean([a, b, c, d])
-    return dist
-
-
 def eval_archive_dist(ind1, ind2):
 
     if ind1.m1.predicted_label == ind1.m1.expected_label:
-        ind1_correct = ind1.m1.purified
-        ind1_misclass = ind1.m2.purified
+        ind1_correct = ind1.m1.image_tensor
+        ind1_misclass = ind1.m2.image_tensor
     else:
-        ind1_correct = ind1.m2.purified
-        ind1_misclass = ind1.m1.purified
+        ind1_correct = ind1.m2.image_tensor
+        ind1_misclass = ind1.m1.image_tensor
 
     if ind2.m1.predicted_label == ind1.m2.expected_label:
-        ind2_correct = ind2.m1.purified
-        ind2_misclass = ind2.m2.purified
+        ind2_correct = ind2.m1.image_tensor
+        ind2_misclass = ind2.m2.image_tensor
     else:
-        ind2_correct = ind2.m2.purified
-        ind2_misclass = ind2.m1.purified
+        ind2_correct = ind2.m2.image_tensor
+        ind2_misclass = ind2.m1.image_tensor
 
     dist1 = utils.get_distance(ind1_correct, ind2_correct)
     dist2 = utils.get_distance(ind1_misclass, ind2_misclass)

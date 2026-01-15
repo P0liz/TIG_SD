@@ -58,15 +58,25 @@ def dual_mutation(prompt, digit1, digit2, expected_label, images, confidence_sco
 
     # Keep only best mutation
     # TODO: It might make sens to have 2 different gifs and graphs for each member in this case
-    if confidence1 < confidence2:
+    # Revert if confidence increased
+    if confidence1 > pre_mutation_digit1.confidence:
+        digit1 = pre_mutation_digit1
+        confidence1 = digit1.confidence
+        prediction1 = digit1.predicted_label
+
+    if confidence2 > pre_mutation_digit2.confidence:
         digit2 = pre_mutation_digit2
+        confidence2 = digit2.confidence
+        prediction2 = digit2.predicted_label
+
+    # Keep digit with lower confidence
+    if confidence1 < confidence2:
         images.append(digit1.image)
-        confidence_scores.append(digit1.confidence)
+        confidence_scores.append(confidence1)
         return prediction1, confidence1, digit1, digit2
     else:
-        digit1 = pre_mutation_digit1
         images.append(digit2.image)
-        confidence_scores.append(digit2.confidence)
+        confidence_scores.append(confidence2)
         return prediction2, confidence2, digit2, digit1
 
 
@@ -152,7 +162,7 @@ def main(prompt, expected_label, max_steps=STEPS):
             f"pred={selected_digit.predicted_label} "
             f"conf={selected_digit.confidence:.3f} "
             f"cos_sim={cos_sim:.3f} "
-            f"euc_dist={euc_dist:.3f}"
+            f"euc_dist={euc_dist:.3f} "
             f"euc_img_dist={img_euc_dist:.3f}"
         )
 

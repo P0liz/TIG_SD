@@ -462,6 +462,6 @@ if __name__ == "__main__":
 
     # TODO: why both???
     print_archive_experiment(archive.get_archive())
-    print_archive(archive.get_archive())
+    # print_archive(archive.get_archive())
 
     print("GAME OVER")

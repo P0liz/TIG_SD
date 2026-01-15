@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 from folder import Folder
-from config import IMG_SIZE
 import numpy as np
 import torch
 
@@ -16,6 +15,10 @@ import torch
 
 
 def get_distance(v1, v2):
+    if isinstance(v1, torch.Tensor):
+        v1 = v1.detach().cpu().numpy()
+    if isinstance(v2, torch.Tensor):
+        v2 = v2.detach().cpu().numpy()
     return np.linalg.norm(v1 - v2)
 
 
@@ -31,18 +34,21 @@ def print_archive(archive):
                 + str(i)
                 + "_mem1_l_"
                 + str(ind.m1.predicted_label)
-                + "_seed_"
-                + str(ind.seed)
+                + "_prompt_"
+                + str(ind.prompt)
             ),
         )
         plt.imsave(
-            filename1,
-            ind.m1.purified.reshape(IMG_SIZE, IMG_SIZE),
+            filename1 + ".png",
+            ind.m1.image_tensor.detach().cpu().numpy().squeeze(),
             cmap=cm.gray,
             format="png",
         )
-        np.save(filename1, ind.m1.purified)
-        assert np.array_equal(ind.m1.purified, np.load(filename1 + ".npy"))
+        np.save(filename1, ind.m1.image_tensor.detach().cpu().numpy().squeeze())
+        assert np.array_equal(
+            ind.m1.image_tensor.detach().cpu().numpy().squeeze(),
+            np.load(filename1 + ".npy"),
+        )
 
         filename2 = join(
             dst,
@@ -51,18 +57,21 @@ def print_archive(archive):
                 + str(i)
                 + "_mem2_l_"
                 + str(ind.m2.predicted_label)
-                + "_seed_"
-                + str(ind.seed)
+                + "_prompt_"
+                + str(ind.prompt)
             ),
         )
         plt.imsave(
-            filename2,
-            ind.m2.purified.reshape(IMG_SIZE, IMG_SIZE),
+            filename2 + ".png",
+            ind.m2.image_tensor.detach().cpu().numpy().squeeze(),
             cmap=cm.gray,
             format="png",
         )
-        np.save(filename2, ind.m2.purified)
-        assert np.array_equal(ind.m2.purified, np.load(filename2 + ".npy"))
+        np.save(filename2, ind.m2.image_tensor.detach().cpu().numpy().squeeze())
+        assert np.array_equal(
+            ind.m2.image_tensor.detach().cpu().numpy().squeeze(),
+            np.load(filename2 + ".npy"),
+        )
 
 
 # TODO: understand why there is this and the previous one used both
@@ -75,30 +84,12 @@ def print_archive_experiment(archive):
         ind.export()
 
 
-def get_mindist_seed(solution, dataset):
-    # Calculate the distance between each misclassified digit and the seed (mindist metric)
-    min_distances = list()
-    for ind in solution:
-        # get seed
-        seed = reshape(dataset[int(ind.seed)])
-
-        # get misclassified member
-        if ind.m1.predicted_label != ind.m1.expected_label:
-            misclassified_member = ind.m1.purified
-        else:
-            misclassified_member = ind.m2.purified
-        dist = np.linalg.norm(misclassified_member - seed)
-        min_distances.append(dist)
-    mindist = np.mean(min_distances)
-    return mindist
-
-
 def get_radius_reference(solution, reference):
     # Calculate the distance between each misclassified digit and the seed (mindist metric)
     min_distances = list()
     for sol in solution:
-        digit = sol.purified
-        dist = np.linalg.norm(digit - reference)
+        digit = sol.image_tensor
+        dist = torch.linalg.norm(digit - reference).item()
         min_distances.append(dist)
     mindist = np.mean(min_distances)
     return mindist
@@ -111,16 +102,9 @@ def get_diameter(solution):
         maxdist = float(0)
         for d2 in solution:
             if d1 != d2:
-                dist = np.linalg.norm(d1.purified - d2.purified)
+                dist = torch.linalg.norm(d1.image_tensor - d2.image_tensor).item()
                 if dist > maxdist:
                     maxdist = dist
         max_distances.append(maxdist)
     diameter = np.mean(max_distances)
     return diameter
-
-
-# Useful function that shapes the input in the format accepted by the ML model.
-def reshape(v):
-    if isinstance(v, np.ndarray):
-        v = torch.from_numpy(v)
-    return v.unsqueeze(0).reshape(1, 1, IMG_SIZE, IMG_SIZE).float() / 255.0
