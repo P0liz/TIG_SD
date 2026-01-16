@@ -17,12 +17,13 @@ class Individual:
     COUNT = 0
     USED_LABELS = set()
 
-    def __init__(self, member1, member2):
+    def __init__(self, member1, member2, prompt, latent):
         self.id = Individual.COUNT
-        self.prompt = None
-        self.members_distance = None
-        self.members_img_euc_dist = None
-        self.members_latent_cos_sim = None
+        self.prompt = prompt
+        self.original_noise = latent
+        self.members_distance = 0
+        self.members_img_euc_dist = 0
+        self.members_latent_cos_sim = 1
         self.sparseness = None
         self.misclass = None
         self.aggregate_ff = None

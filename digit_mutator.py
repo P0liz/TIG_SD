@@ -7,18 +7,24 @@ class DigitMutator:
 
     def __init__(self, digit):
         self.digit = digit
-        # self.seed = digit.seed
 
     def mutate(self, prompt):
-        # def mutate(self, prompt, step, noise_x, noise_y):
-        # Intensità progressiva della mutazione
-        # Fare in modo che più alta è la confidence e maggiore diventa il delta
-        # Vedi anche predictor.py per modificare calcolo della confidence
+        """
+        Mutate the member assigning a delta value based on the number of standing steps
+        The higher the standing steps, the higher the delta
+        Args:
+            prompt (_type_): _description_
+        """
+        # def mutate(self, prompt, step, noise_x, noise_y): # Circular walk
+        # Intensità progressiva della mutazione, nel caso in cui margin_confidence non migliori per troppi step di fila
         base_delta = DELTA
-        delta = base_delta * exp(self.digit.confidence)
+        if self.digit.standing_steps > 5:
+            base_delta = DELTA * (self.digit.standing_steps / 5 + 1)
+        # perturbation_size = base_delta * exp(self.digit.confidence)   # Old method
+        perturbation_size = base_delta  # understand if this should change
 
         # Mutazione nel latent space
-        mutated_latent = mutation_manager.mutate(self.digit.latent, delta)
+        mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size)
 
         # Circular walk mutation
         # mutated_latent = mutation_manager.mutate_circular( self.digit.latent, step, noise_x, noise_y)

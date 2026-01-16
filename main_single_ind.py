@@ -9,11 +9,13 @@ from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 from mutation_manager import get_pipeline
 from data_visualization import export_as_gif, plot_confidence, plot_distance
-from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS
+from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS, MUTATION_TYPE
 
 
 # Mutate only the one with the lower confidence and keep the mutation only if it is better (lower)
-def single_mutation(prompt, digit1, digit2, expected_label, images, confidence_scores):
+def single_mutation_conf(
+    prompt, digit1, digit2, expected_label, images, confidence_scores
+):
     # Chose digit with lower confidence score (cause we want to change the digit's prediction)
     if digit1.confidence <= digit2.confidence:
         selected_digit = digit1
@@ -40,6 +42,44 @@ def single_mutation(prompt, digit1, digit2, expected_label, images, confidence_s
         return None
 
     return prediction, confidence, selected_digit, other_digit
+
+
+def single_mutation_random(
+    prompt, digit1, digit2, expected_label, images, confidence_scores
+):
+    """
+    Mutate a single digit chosen randomly and keep the mutation either way it goes
+    Args:
+        individual (_type_): _description_
+    """
+    # Chose random member
+    flag = random.uniform(0, 1)
+    if flag < 0.5:
+        member_to_mutate = digit1
+        other_member = digit2
+    else:
+        member_to_mutate = digit2
+        other_member = digit1
+
+    # Mutate and predict
+    DigitMutator(member_to_mutate).mutate(prompt)
+    prediction, new_confidence = Predictor.predict_single(
+        member_to_mutate, member_to_mutate.expected_label
+    )
+
+    if new_confidence > member_to_mutate.confidence:
+        member_to_mutate.standing_steps += 1
+    else:
+        member_to_mutate.standing_steps = 0
+
+    member_to_mutate.predicted_label = prediction
+    member_to_mutate.confidence = new_confidence
+
+    # Should have 2 different gifs and plots for each member, not mix them
+    images.append(member_to_mutate.image)
+    confidence_scores.append(member_to_mutate.confidence)
+
+    return prediction, new_confidence, member_to_mutate, other_member
 
 
 # Mutate both members, see if the confidence of both is lower
@@ -133,16 +173,21 @@ def main(prompt, expected_label, max_steps=STEPS):
     # Iterative mutation process
     for step in range(1, max_steps + 1):
 
-        if TRYNEW:
+        if MUTATION_TYPE == "dual":
             prediction, confidence, selected_digit, other_digit = dual_mutation(
                 prompt, digit1, digit2, expected_label, images, confidence_scores
             )
-        else:
-            result = single_mutation(
+        elif MUTATION_TYPE == "single_conf":
+            result = single_mutation_conf(
                 prompt, digit1, digit2, expected_label, images, confidence_scores
             )
             if result is None:
                 continue
+            prediction, confidence, selected_digit, other_digit = result
+        else:
+            result = single_mutation_random(
+                prompt, digit1, digit2, expected_label, images, confidence_scores
+            )
             prediction, confidence, selected_digit, other_digit = result
 
         selected_digit.predicted_label = prediction
@@ -217,9 +262,7 @@ if __name__ == "__main__":
         "A photo of Eight8 Number8",
         "A photo of Nine9 Number9",
     ]
-    for i in range(0, 4):
-        if i >= 2:
-            TRYNEW = True
+    for i in range(0, 5):
         Folder.initialize()
         randprompt = random.choice(prompts)
         expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))

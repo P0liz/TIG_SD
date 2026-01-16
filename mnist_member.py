@@ -21,6 +21,7 @@ class MnistMember:
         self.predicted_label = None
         self.confidence = None
         self.correctly_classified = None
+        self.standing_steps = 0
         MnistMember.COUNT += 1
 
     def clone(self):

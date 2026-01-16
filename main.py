@@ -69,13 +69,14 @@ class GeneticAlgorithm:
     # ========================================================================
 
     def generate_member(
-        self, prompt, expected_label, guidance_scale=3.5, max_attempts=10
+        self, prompt, expected_label, latent, guidance_scale=3.5, max_attempts=10
     ):
         """
         Generate a member with Stable Diffusion and Validate it if possible
         Args:
             prompt (_type_): _description_
             expected_label (_type_): _description_
+            latent (_type_): _description_
             guidance_scale (float, optional): _description_. Defaults to 3.5.
             max_attempts (int, optional): _description_. Defaults to 10.
 
@@ -83,12 +84,6 @@ class GeneticAlgorithm:
             member ore None if failure
         """
         for i in range(max_attempts):
-            latent = torch.randn(
-                (1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
-                device=DEVICE,
-                dtype=DTYPE,
-            )
-
             # Generate member and classify it
             member = MnistMember(latent, expected_label)
             DigitMutator(member).generate(prompt, guidance_scale=guidance_scale)
@@ -123,23 +118,24 @@ class GeneticAlgorithm:
             label = random.randint(0, 9)
         prompt = PROMPTS[label]
 
+        latent = torch.randn(
+            (1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
+            device=DEVICE,
+            dtype=DTYPE,
+        )
+
         # Generate members
-        m1 = self.generate_member(prompt, label)
+        m1 = self.generate_member(prompt, label, latent)
         if m1 is None:
             # Riprova con guidance più alta
-            m1 = self.generate_member(prompt, label, guidance_scale=5.0)
+            m1 = self.generate_member(prompt, label, latent, guidance_scale=5.0)
             if m1 is None:
                 raise ValueError(f"Cannot create individual for label {label}")
 
         m2 = m1.clone()
 
         # Create individual
-        individual = creator.Individual(m1, m2)
-        individual.members_distance = 0
-        individual.members_img_euc_dist = 0
-        individual.members_latent_cos_sim = 1
-        individual.prompt = prompt
-
+        individual = creator.Individual(m1, m2, prompt, latent)
         Individual.USED_LABELS.add(label)
 
         return individual
@@ -177,97 +173,47 @@ class GeneticAlgorithm:
     # ========================================================================
     # Mutation
     # ========================================================================
-
-    # Mutate only the one with the lower confidence and keep the mutation only if it is better (lower)
-    def mutate_single(self, individual):
-        # Chose digit with lower confidence score (cause we want to change the digit's prediction
-        if individual.m1.confidence <= individual.m2.confidence:
-            digit_to_mutate = individual.m1
-            other_digit = individual.m2
-            is_m1 = True
+    def mutate_individual(self, individual):
+        """
+        Mutate a single digit chosen randomly and keep the mutation either way it goes
+        Args:
+            individual (_type_): _description_
+        """
+        # Chose random member
+        flag = random.uniform(0, 1)
+        if flag < 0.5:
+            member_to_mutate = individual.m1
+            other_member = individual.m2
         else:
-            digit_to_mutate = individual.m2
-            other_digit = individual.m1
-            is_m1 = False
+            member_to_mutate = individual.m2
+            other_member = individual.m1
 
-        # Backup
-        backup = digit_to_mutate.clone()
         # TODO: add plotting
 
         # Mutate and predict
-        prompt = PROMPTS[digit_to_mutate.expected_label]
-        DigitMutator(digit_to_mutate).mutate(prompt)
+        prompt = PROMPTS[member_to_mutate.expected_label]
+        DigitMutator(member_to_mutate).mutate(prompt)
         prediction, new_confidence = Predictor.predict_single(
-            digit_to_mutate, digit_to_mutate.expected_label
+            member_to_mutate, member_to_mutate.expected_label
         )
 
-        # Revert mutation in case confidence gets higher
-        if new_confidence < backup.confidence:
-            digit_to_mutate.predicted_label = prediction
-            digit_to_mutate.confidence = new_confidence
-            digit_to_mutate.correctly_classified = (
-                prediction == digit_to_mutate.expected_label
-            )
-
-            # Update distances
-            individual.members_distance = digit_to_mutate.distance(other_digit)
-            individual.members_img_euc_dist = digit_to_mutate.image_distance(
-                other_digit
-            )
-            individual.members_latent_cos_sim = digit_to_mutate.cosine_similarity(
-                other_digit
-            )
+        if new_confidence > member_to_mutate.confidence:
+            member_to_mutate.standing_steps += 1
         else:
-            if is_m1:
-                individual.m1 = backup
-            else:
-                individual.m2 = backup
+            member_to_mutate.standing_steps = 0
 
-    # Mutate both members and keep the one with the lower confidence (independently from the starting confidence)
-    def mutate_dual(self, individual):
-        # Backup
-        backup_m1 = individual.m1.clone()
-        backup_m2 = individual.m2.clone()
-
-        # Mutate and predict
-        prompt1 = PROMPTS[individual.m1.expected_label]
-        prompt2 = PROMPTS[individual.m2.expected_label]
-        DigitMutator(individual.m1).mutate(prompt1)
-        DigitMutator(individual.m2).mutate(prompt2)
-        pred1, conf1 = Predictor.predict_single(
-            individual.m1, individual.m1.expected_label
+        member_to_mutate.predicted_label = prediction
+        member_to_mutate.confidence = new_confidence
+        member_to_mutate.correctly_classified = (
+            prediction == member_to_mutate.expected_label
         )
-        pred2, conf2 = Predictor.predict_single(
-            individual.m2, individual.m2.expected_label
-        )
-
-        # Keep only best mutation
-        # TODO: It might make sens to have 2 different gifs and graphs for each member in this case
-        if conf1 < conf2:
-            individual.m2 = backup_m2
-            individual.m1.predicted_label = pred1
-            individual.m1.confidence = conf1
-            individual.m1.correctly_classified = pred1 == individual.m1.expected_label
-        else:
-            individual.m1 = backup_m1
-            individual.m2.predicted_label = pred2
-            individual.m2.confidence = conf2
-            individual.m2.correctly_classified = pred2 == individual.m2.expected_label
 
         # Update distances
-        individual.members_distance = individual.m1.distance(individual.m2)
-        individual.members_img_euc_dist = individual.m1.image_distance(individual.m2)
-        individual.members_latent_cos_sim = individual.m1.cosine_similarity(
-            individual.m2
+        individual.members_distance = member_to_mutate.distance(other_member)
+        individual.members_img_euc_dist = member_to_mutate.image_distance(other_member)
+        individual.members_latent_cos_sim = member_to_mutate.cosine_similarity(
+            other_member
         )
-
-    # Switch type of mutation
-    # it was better to put this in the digit mutator but it's fine since it is temporary
-    def mutate(self, individual):
-        if self.mutation_type == "single":
-            self.mutate_single(individual)
-        else:
-            self.mutate_dual(individual)
 
     # ========================================================================
     # Evaluation
@@ -401,7 +347,7 @@ class GeneticAlgorithm:
             # 3. Mutation
             print(f"Mutating {len(offspring)} offspring...")
             for ind in offspring:
-                self.mutate(ind)
+                self.mutate_individual(ind)
                 del ind.fitness.values
 
             # 4. Evaluation
@@ -460,8 +406,9 @@ if __name__ == "__main__":
     print("\n### FINAL ARCHIVE")
     from utils import print_archive, print_archive_experiment
 
-    # TODO: why both???
+    # TODO: change how an ind is saved (atm doubled info)
     print_archive_experiment(archive.get_archive())
+    # TODO: why both functions?
     # print_archive(archive.get_archive())
 
     print("GAME OVER")

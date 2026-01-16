@@ -32,7 +32,7 @@ IMG_SIZE = 28
 MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 LORA_PATH = "./SD_weights"
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
-DELTA = 0.025  # works when calculating delta with distance between latent vectors
+DELTA = 0.06  # Old value 0.025
 NOISE_SCALE = 0.025  # Circular walk
 
 # Torch settings
@@ -51,4 +51,4 @@ WIDTH = 512
 
 # Dev testing
 TRYNEW = False
-MUTATION_TYPE = "single"  # O 'dual'
+MUTATION_TYPE = "single_random"  # O "single_conf" # O 'dual'

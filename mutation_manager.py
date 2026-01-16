@@ -101,7 +101,7 @@ def get_pipeline():
     return pipeline_manager.get_pipe()
 
 
-def mutate(z_orig, delta):
+def mutate(z_orig, perturbation_size):
     """
     Muta il latent code aggiungendo rumore gaussiano
 
@@ -112,12 +112,11 @@ def mutate(z_orig, delta):
     Returns:
         z_mut: torch.Tensor - latent mutato
     """
-    epsilon = torch.randn_like(z_orig)  # ε ~ N(0, I) noise
-    z_mut = z_orig + delta * epsilon
+    epsilon = torch.randn(z_orig.size(), device=DEVICE)  # ε ~ N(0, I) noise
+    z_mut = z_orig + perturbation_size * epsilon
     return z_mut
 
 
-# TODO: testare questo e capire quale raggio usare
 def mutate_circular(
     z_orig, step, noise_x, noise_y, total_steps=STEPS, noise_scale=NOISE_SCALE
 ):
