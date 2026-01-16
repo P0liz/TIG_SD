@@ -197,6 +197,7 @@ class GeneticAlgorithm:
             member_to_mutate, member_to_mutate.expected_label
         )
 
+        # TODO: add a range instead of just a single value to check?
         if new_confidence > member_to_mutate.confidence:
             member_to_mutate.standing_steps += 1
         else:

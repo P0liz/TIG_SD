@@ -32,7 +32,7 @@ IMG_SIZE = 28
 MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 LORA_PATH = "./SD_weights"
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
-DELTA = 0.06  # Old value 0.025
+DELTA = 0.04  # Old value 0.025
 NOISE_SCALE = 0.025  # Circular walk
 
 # Torch settings

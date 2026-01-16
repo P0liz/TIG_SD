@@ -76,11 +76,7 @@ def print_archive(archive):
 
 # TODO: understand why there is this and the previous one used both
 def print_archive_experiment(archive):
-    for i, ind in enumerate(archive):
-        digit = ind.m1
-        digit.export(ind.id)
-        digit = ind.m2
-        digit.export(ind.id)
+    for ind in enumerate(archive):
         ind.export()
 
 

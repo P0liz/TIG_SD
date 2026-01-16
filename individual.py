@@ -1,12 +1,10 @@
 import json
 from os import makedirs
-from os.path import join, exists
-from posixpath import basename
+from os.path import join
 
 import numpy as np
 from numpy import mean
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+from torchvision.utils import save_image
 
 import evaluator
 from folder import Folder
@@ -74,15 +72,10 @@ class Individual:
             png_path = join(ind_dir, base_name + ".png")
             npy_path = join(ind_dir, base_name + ".npy")
 
+            save_image(member.image_tensor, png_path)
+
             img_np = member.image_tensor.detach().cpu().numpy().squeeze()
-
-            # Save image (visual)
-            plt.imsave(png_path, img_np, cmap=cm.gray, format="png")
-
-            # Save raw tensor (scientific)
             np.save(npy_path, img_np)
-
-            # Consistency check
             assert np.array_equal(img_np, np.load(npy_path))
 
         # Save members

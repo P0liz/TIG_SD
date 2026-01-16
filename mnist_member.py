@@ -44,31 +44,3 @@ class MnistMember:
 
     def distance(self, other):
         return torch.linalg.norm(self.latent - other.latent).item()
-
-    def export(self, ind_id=None):
-        # Create directory
-        if ind_id is not None:
-            member_dir = join(Folder.DST_IND, f"ind{ind_id}")
-        else:
-            member_dir = join(Folder.DST_IND, f"member{self.id}")
-        makedirs(member_dir, exist_ok=True)
-
-        # Save metadata
-        data = {
-            "id": str(self.id),
-            "expected_label": str(self.expected_label),
-            "predicted_label": str(self.predicted_label),
-            "confidence": str(self.confidence),
-            "correctly_classified": str(self.correctly_classified),
-        }
-        with open(join(member_dir, "data.json"), "w") as f:
-            json.dump(data, f, indent=4)
-
-        # Save image
-        base_name = f"member{self.id}_l_{self.predicted_label}"
-        png_path = join(member_dir, base_name + ".png")
-        npy_path = join(member_dir, base_name + ".npy")
-
-        img_np = self.image_tensor.detach().cpu().numpy().squeeze()
-        plt.imsave(png_path, img_np, cmap=cm.gray, format="png")
-        np.save(npy_path, img_np)

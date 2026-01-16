@@ -18,10 +18,11 @@ class DigitMutator:
         # def mutate(self, prompt, step, noise_x, noise_y): # Circular walk
         # Intensità progressiva della mutazione, nel caso in cui margin_confidence non migliori per troppi step di fila
         base_delta = DELTA
-        if self.digit.standing_steps > 5:
+        if self.digit.standing_steps >= 5:
             base_delta = DELTA * (self.digit.standing_steps / 5 + 1)
         # perturbation_size = base_delta * exp(self.digit.confidence)   # Old method
         perturbation_size = base_delta  # understand if this should change
+        print(f"perturbation_size: {perturbation_size}")
 
         # Mutazione nel latent space
         mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size)

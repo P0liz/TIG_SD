@@ -45,7 +45,7 @@ def single_mutation_conf(
 
 
 def single_mutation_random(
-    prompt, digit1, digit2, expected_label, images, confidence_scores
+    prompt, digit1, digit2, images1, conf_scores1, images2, conf_scores2
 ):
     """
     Mutate a single digit chosen randomly and keep the mutation either way it goes
@@ -57,9 +57,11 @@ def single_mutation_random(
     if flag < 0.5:
         member_to_mutate = digit1
         other_member = digit2
+        ism1 = True
     else:
         member_to_mutate = digit2
         other_member = digit1
+        ism1 = False
 
     # Mutate and predict
     DigitMutator(member_to_mutate).mutate(prompt)
@@ -67,7 +69,7 @@ def single_mutation_random(
         member_to_mutate, member_to_mutate.expected_label
     )
 
-    if new_confidence > member_to_mutate.confidence:
+    if abs(new_confidence - member_to_mutate.confidence) < 0.01:
         member_to_mutate.standing_steps += 1
     else:
         member_to_mutate.standing_steps = 0
@@ -75,16 +77,21 @@ def single_mutation_random(
     member_to_mutate.predicted_label = prediction
     member_to_mutate.confidence = new_confidence
 
-    # Should have 2 different gifs and plots for each member, not mix them
-    images.append(member_to_mutate.image)
-    confidence_scores.append(member_to_mutate.confidence)
+    if ism1:
+        images1.append(member_to_mutate.image)
+        conf_scores1.append(member_to_mutate.confidence)
+    else:
+        images2.append(member_to_mutate.image)
+        conf_scores2.append(member_to_mutate.confidence)
 
     return prediction, new_confidence, member_to_mutate, other_member
 
 
 # Mutate both members, see if the confidence of both is lower
 # At the end chose the one with the lower confidence
-def dual_mutation(prompt, digit1, digit2, expected_label, images, confidence_scores):
+def dual_mutation(
+    prompt, digit1, digit2, expected_label, images1, conf_scores1, images2, conf_scores2
+):
     # Save data pre mutation
     pre_mutation_digit1 = digit1.clone()
     pre_mutation_digit2 = digit2.clone()
@@ -112,12 +119,12 @@ def dual_mutation(prompt, digit1, digit2, expected_label, images, confidence_sco
 
     # Keep digit with lower confidence
     if confidence1 < confidence2:
-        images.append(digit1.image)
-        confidence_scores.append(confidence1)
+        images1.append(digit1.image)
+        conf_scores1.append(confidence1)
         return prediction1, confidence1, digit1, digit2
     else:
-        images.append(digit2.image)
-        confidence_scores.append(confidence2)
+        images2.append(digit2.image)
+        conf_scores2.append(confidence2)
         return prediction2, confidence2, digit2, digit1
 
 
@@ -128,6 +135,8 @@ def main(prompt, expected_label, max_steps=STEPS):
         device=DEVICE,
         dtype=DTYPE,
     )
+
+    print(f"Mutation type: {MUTATION_TYPE}")
     # Scala il latent secondo lo scheduler
     # latent = latent * get_pipeline().scheduler.init_noise_sigma
 
@@ -161,8 +170,10 @@ def main(prompt, expected_label, max_steps=STEPS):
     noise_x = torch.randn_like(latent)  # Direzione X (fissa)
     noise_y = torch.randn_like(latent)  # Direzione Y (fissa)
 
-    images = []
-    confidence_scores = []
+    images1 = []
+    conf_scores1 = []
+    images2 = []
+    conf_scores2 = []
     euc_img_dists = []
     euc_img_dists.append(0)
     euc_dists = []
@@ -175,18 +186,25 @@ def main(prompt, expected_label, max_steps=STEPS):
 
         if MUTATION_TYPE == "dual":
             prediction, confidence, selected_digit, other_digit = dual_mutation(
-                prompt, digit1, digit2, expected_label, images, confidence_scores
+                prompt,
+                digit1,
+                digit2,
+                expected_label,
+                images1,
+                conf_scores1,
+                images2,
+                conf_scores2,
             )
         elif MUTATION_TYPE == "single_conf":
             result = single_mutation_conf(
-                prompt, digit1, digit2, expected_label, images, confidence_scores
+                prompt, digit1, digit2, expected_label, images1, conf_scores1
             )
             if result is None:
                 continue
             prediction, confidence, selected_digit, other_digit = result
         else:
             result = single_mutation_random(
-                prompt, digit1, digit2, expected_label, images, confidence_scores
+                prompt, digit1, digit2, images1, conf_scores1, images2, conf_scores2
             )
             prediction, confidence, selected_digit, other_digit = result
 
@@ -220,7 +238,9 @@ def main(prompt, expected_label, max_steps=STEPS):
             )
             break
 
-    ind = Individual(digit1, digit2)  # Create final individual to see results
+    ind = Individual(
+        digit1, digit2, prompt, None
+    )  # Create final individual to see results
     ind.misstep = step
     ind.bad_prediction = selected_digit.predicted_label
     ind.members_distance = euc_dist
@@ -229,9 +249,13 @@ def main(prompt, expected_label, max_steps=STEPS):
     ind.export()
     base_path = f"{Folder.DST}"
     export_as_gif(
-        f"{base_path}/individual_{Folder.run_id}.gif", images, rubber_band=True
+        f"{base_path}/individual_{Folder.run_id}.gif", images1, rubber_band=True
     )
-    plot_confidence(confidence_scores, f"{base_path}/confidence_{Folder.run_id}.png")
+    export_as_gif(
+        f"{base_path}/individual_{Folder.run_id}.gif", images2, rubber_band=True
+    )
+    plot_confidence(conf_scores1, f"{base_path}/confidence_{Folder.run_id}.png")
+    plot_confidence(conf_scores2, f"{base_path}/confidence_{Folder.run_id}.png")
     plot_distance(
         euc_dists,
         f"{base_path}/euclidean_distance_{Folder.run_id}.png",
