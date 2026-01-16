@@ -44,7 +44,7 @@ def confidence_margin(logits, exp_label):
     logits_tensor = torch.from_numpy(logits).float()
     # Apply softmax to normalize (since I do not want row logits)
     softmax_probs = torch.softmax(logits_tensor, dim=0).numpy()
-    print(f"softmax_probs: {softmax_probs}")
+    # print(f"softmax_probs: {softmax_probs}")
 
     expected_prob = softmax_probs[exp_label]
     # Select the two best indices

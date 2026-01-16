@@ -42,7 +42,8 @@ def single_mutation(prompt, digit1, digit2, expected_label, images, confidence_s
     return prediction, confidence, selected_digit, other_digit
 
 
-# Mutate both members and keep the one with the lower confidence (independently from the starting confidence)
+# Mutate both members, see if the confidence of both is lower
+# At the end chose the one with the lower confidence
 def dual_mutation(prompt, digit1, digit2, expected_label, images, confidence_scores):
     # Save data pre mutation
     pre_mutation_digit1 = digit1.clone()
@@ -176,7 +177,7 @@ def main(prompt, expected_label, max_steps=STEPS):
 
     ind = Individual(digit1, digit2)  # Create final individual to see results
     ind.misstep = step
-    ind.misclass = selected_digit.predicted_label
+    ind.bad_prediction = selected_digit.predicted_label
     ind.members_distance = euc_dist
     ind.members_img_euc_dist = img_euc_dist
     ind.members_latent_cos_sim = cos_sim

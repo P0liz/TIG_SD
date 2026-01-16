@@ -30,6 +30,7 @@ class Individual:
         self.m1 = member1
         self.m2 = member2
         self.misstep = 0
+        self.bad_prediction = None
 
     # TODO: why would I need this?
     def reset(self):
@@ -45,7 +46,10 @@ class Individual:
             "id": str(self.id),
             "expected_label": str(self.m1.expected_label),
             "misclass": str(self.misclass),
-            "steps": str(self.misstep),
+            "aggregate_ff": str(self.aggregate_ff),
+            "sparseness": str(self.sparseness),
+            "misstep": str(self.misstep),
+            "bad_prediction": str(self.bad_prediction),
             "members_distance": str(self.members_distance),
             "members_img_euc_dist": str(self.members_img_euc_dist),
             "members_latent_cos_sim": str(self.members_latent_cos_sim),
