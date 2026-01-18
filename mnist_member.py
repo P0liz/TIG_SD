@@ -14,8 +14,8 @@ class MnistMember:
 
     def __init__(self, latent, expected_label):
         self.id = MnistMember.COUNT
-        self.image = None
-        self.image_tensor = None
+        self.image = None  # PIL Image
+        self.image_tensor = None  # Torch Tensor [1, 1, 28, 28] in grayscale
         self.latent = latent
         self.expected_label = expected_label
         self.predicted_label = None

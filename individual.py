@@ -4,8 +4,8 @@ from os.path import join
 
 import numpy as np
 from numpy import mean
-from torchvision.utils import save_image
-
+from matplotlib import pyplot as plt
+import matplotlib.cm as cm
 import evaluator
 from folder import Folder
 
@@ -72,10 +72,16 @@ class Individual:
             png_path = join(ind_dir, base_name + ".png")
             npy_path = join(ind_dir, base_name + ".npy")
 
-            save_image(member.image_tensor, png_path)
-
             img_np = member.image_tensor.detach().cpu().numpy().squeeze()
+
+            # Save image (visual)
+            # Rememeber to save image from the preprocessed tensor (already 28x28 grayscale)
+            plt.imsave(png_path, img_np, cmap=cm.gray, format="png", vmin=0, vmax=1)
+
+            # Save raw tensor (scientific)
             np.save(npy_path, img_np)
+
+            # Consistency check
             assert np.array_equal(img_np, np.load(npy_path))
 
         # Save members

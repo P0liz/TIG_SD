@@ -7,17 +7,25 @@ def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
     Create a gif from all the images generated in the process
 
     Args:
-        filename (_type_): _description_
-        images (_type_): _description_
-        frames_per_second (int, optional): _description_. Defaults to 5.
-        rubber_band (bool, optional): _description_. Defaults to False.
+        filename: path to save the gif
+        images: list of torch.Tensor [1, 1, 28, 28] grayscale
+        frames_per_second (int, optional): Defaults to 5.
+        rubber_band (bool, optional): Defaults to False.
     """
+    pil_images = []
+    for img in images:
+        # Converting tensor to PIL Image (in grayscale)
+        img_np = img.detach().cpu().numpy().squeeze()
+        img_np = (img_np * 255).astype("uint8")
+        pil_images.append(Image.fromarray(img_np, mode="L"))
+
     if rubber_band:
-        images += images[2:-1][::-1]
-    images[0].save(
+        pil_images += pil_images[2:-1][::-1]
+
+    pil_images[0].save(
         filename,
         save_all=True,
-        append_images=images[1:],
+        append_images=pil_images[1:],
         duration=1000 // frames_per_second,
         loop=0,
     )

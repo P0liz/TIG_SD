@@ -16,7 +16,8 @@ class DigitMutator:
             prompt (_type_): _description_
         """
         # def mutate(self, prompt, step, noise_x, noise_y): # Circular walk
-        # Intensità progressiva della mutazione, nel caso in cui margin_confidence non migliori per troppi step di fila
+        # Progressive intensification of perturbation size
+        # It is increased by one time every 5 standing steps
         base_delta = DELTA
         if self.digit.standing_steps >= 5:
             base_delta = DELTA * (self.digit.standing_steps / 5 + 1)

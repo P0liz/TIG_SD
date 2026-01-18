@@ -25,7 +25,7 @@ def single_mutation_conf(
         other_digit = digit1
 
     # Save data pre mutation
-    images.append(selected_digit.image)
+    images.append(selected_digit.image_tensor)
     confidence_scores.append(selected_digit.confidence)
     pre_mutation_digit = selected_digit.clone()
 
@@ -50,7 +50,16 @@ def single_mutation_random(
     """
     Mutate a single digit chosen randomly and keep the mutation either way it goes
     Args:
-        individual (_type_): _description_
+        prompt (_type_): _description_
+        digit1 (_type_): _description_
+        digit2 (_type_): _description_
+        images1 (_type_): _description_
+        conf_scores1 (_type_): _description_
+        images2 (_type_): _description_
+        conf_scores2 (_type_): _description_
+
+    Returns:
+        _type_: _description_
     """
     # Chose random member
     flag = random.uniform(0, 1)
@@ -62,6 +71,7 @@ def single_mutation_random(
         member_to_mutate = digit2
         other_member = digit1
         ism1 = False
+    print(f"Mutation on member: {1 if ism1 else 2}")
 
     # Mutate and predict
     DigitMutator(member_to_mutate).mutate(prompt)
@@ -69,20 +79,21 @@ def single_mutation_random(
         member_to_mutate, member_to_mutate.expected_label
     )
 
-    if abs(new_confidence - member_to_mutate.confidence) < 0.01:
+    # If confidence diff is too low and the new confidence is higher then...
+    if (
+        abs(new_confidence - member_to_mutate.confidence) <= 0.01
+        and new_confidence >= member_to_mutate.confidence
+    ):
         member_to_mutate.standing_steps += 1
     else:
         member_to_mutate.standing_steps = 0
 
-    member_to_mutate.predicted_label = prediction
-    member_to_mutate.confidence = new_confidence
-
     if ism1:
-        images1.append(member_to_mutate.image)
-        conf_scores1.append(member_to_mutate.confidence)
+        images1.append(member_to_mutate.image_tensor)
+        conf_scores1.append(new_confidence)
     else:
-        images2.append(member_to_mutate.image)
-        conf_scores2.append(member_to_mutate.confidence)
+        images2.append(member_to_mutate.image_tensor)
+        conf_scores2.append(new_confidence)
 
     return prediction, new_confidence, member_to_mutate, other_member
 
@@ -119,49 +130,50 @@ def dual_mutation(
 
     # Keep digit with lower confidence
     if confidence1 < confidence2:
-        images1.append(digit1.image)
+        images1.append(digit1.image_tensor)
         conf_scores1.append(confidence1)
         return prediction1, confidence1, digit1, digit2
     else:
-        images2.append(digit2.image)
+        images2.append(digit2.image_tensor)
         conf_scores2.append(confidence2)
         return prediction2, confidence2, digit2, digit1
 
 
 def main(prompt, expected_label, max_steps=STEPS):
-    # Starting from a random latent noise vector
-    latent = torch.randn(
-        (1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
-        device=DEVICE,
-        dtype=DTYPE,
-    )
+    # Force finding a valid initial latent
+    while True:
+        # Starting from a random latent noise vector
+        latent = torch.randn(
+            (1, get_pipeline().unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
+            device=DEVICE,
+            dtype=DTYPE,
+        )
 
-    print(f"Mutation type: {MUTATION_TYPE}")
-    # Scala il latent secondo lo scheduler
-    # latent = latent * get_pipeline().scheduler.init_noise_sigma
+        print(f"Mutation type: {MUTATION_TYPE}")
+        # Scala il latent secondo lo scheduler
+        # latent = latent * get_pipeline().scheduler.init_noise_sigma
 
-    digit1 = MnistMember(latent, expected_label)
+        digit1 = MnistMember(latent, expected_label)
 
-    # Initial generation and validation
-    # Higher guidance_scale to assure the prompt is followed correctly
-    DigitMutator(digit1).generate(prompt, guidance_scale=3.5)
-    prediction, confidence = Predictor.predict_single(digit1, expected_label)
+        # Initial generation and validation
+        # Higher guidance_scale to assure the prompt is followed correctly
+        DigitMutator(digit1).generate(prompt, guidance_scale=3.5)
+        prediction, confidence = Predictor.predict_single(digit1, expected_label)
 
-    # Initial assignment
-    digit1.predicted_label = prediction
-    digit1.confidence = confidence
-    if digit1.expected_label == digit1.predicted_label:
-        digit1.correctly_classified = True
-    else:
-        digit1.correctly_classified = False
+        # Initial assignment
+        digit1.predicted_label = prediction
+        digit1.confidence = confidence
+        if digit1.expected_label == digit1.predicted_label:
+            digit1.correctly_classified = True
+        else:
+            digit1.correctly_classified = False
 
-    if not digit1.correctly_classified:
-        print(prompt, " - exp: ", expected_label)
-        print(f"pred={digit1.predicted_label} " f"exp={digit1.expected_label}")
-        ind = Individual(digit1, digit1)
-        ind.export()
-        print("Initial latent does not satisfy the label")
-        return
+        if not digit1.correctly_classified:
+            print(prompt, " - exp: ", expected_label)
+            print(f"pred={digit1.predicted_label} " f"exp={digit1.expected_label}")
+            print("Initial latent does not satisfy the label")
+        else:
+            break
 
     print(f"[000] " f"exp={digit1.expected_label} " f"conf={digit1.confidence:.3f}")
     digit2 = digit1.clone()  # second member of an Individual
@@ -249,13 +261,13 @@ def main(prompt, expected_label, max_steps=STEPS):
     ind.export()
     base_path = f"{Folder.DST}"
     export_as_gif(
-        f"{base_path}/individual_{Folder.run_id}.gif", images1, rubber_band=True
+        f"{base_path}/individual_{Folder.run_id}_1.gif", images1, rubber_band=True
     )
     export_as_gif(
-        f"{base_path}/individual_{Folder.run_id}.gif", images2, rubber_band=True
+        f"{base_path}/individual_{Folder.run_id}_2.gif", images2, rubber_band=True
     )
-    plot_confidence(conf_scores1, f"{base_path}/confidence_{Folder.run_id}.png")
-    plot_confidence(conf_scores2, f"{base_path}/confidence_{Folder.run_id}.png")
+    plot_confidence(conf_scores1, f"{base_path}/confidence_{Folder.run_id}_1.png")
+    plot_confidence(conf_scores2, f"{base_path}/confidence_{Folder.run_id}_2.png")
     plot_distance(
         euc_dists,
         f"{base_path}/euclidean_distance_{Folder.run_id}.png",

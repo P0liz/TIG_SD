@@ -197,8 +197,11 @@ class GeneticAlgorithm:
             member_to_mutate, member_to_mutate.expected_label
         )
 
-        # TODO: add a range instead of just a single value to check?
-        if new_confidence > member_to_mutate.confidence:
+        # If confidence diff is too low and the new confidence is higher then...
+        if (
+            abs(new_confidence - member_to_mutate.confidence) <= 0.01
+            and new_confidence >= member_to_mutate.confidence
+        ):
             member_to_mutate.standing_steps += 1
         else:
             member_to_mutate.standing_steps = 0
