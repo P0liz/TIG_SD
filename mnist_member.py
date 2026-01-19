@@ -26,5 +26,10 @@ class MnistMember:
         clone_digit.correctly_classified = self.correctly_classified
         return clone_digit
 
+    def reset(self):
+        self.predicted_label = None
+        self.confidence = None
+        self.correctly_classified = None
+
     def distance(self, other):
         return utils.get_distance(self, other)

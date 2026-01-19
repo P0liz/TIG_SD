@@ -40,6 +40,8 @@ class DigitMutator:
         self.digit.latent = mutated_latent
         self.digit.image_tensor = mutated_tensor
         self.digit.image = image
+        # Reset prediction status to trigger re-evaluation
+        self.digit.reset()
 
     def generate(self, prompt, guidance_scale):
         _, mutated_tensor, image = mutation_manager.generate(

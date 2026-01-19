@@ -20,16 +20,33 @@ class Predictor:
     print("Loaded classifier")
 
     def predict_single(dig, exp_label):
-        new_logits = (
-            Predictor.classifier(dig.image_tensor).squeeze().detach().cpu().numpy()
-        )
+        with torch.no_grad():
+            logits = Predictor.classifier(dig.image_tensor).squeeze().cpu().numpy()
 
-        # Margin between top logits as confidence score
-        # label = np.argmax(new_logits)
-        # confidence = simple_confidence_margin(new_logits)
-        confidence, label = confidence_margin(new_logits, exp_label)
+        # Margin between the 2 top logits as confidence score
+        # confidence, label = simple_confidence_margin(logits)
+
+        # margin between expected and top logits
+        confidence, label = confidence_margin(logits, exp_label)
 
         return label, confidence
+
+    def predict(members, exp_labels):
+        batch_tensors = torch.stack([member.image_tensor for member in members]).to(
+            DEVICE
+        )
+
+        with torch.no_grad():
+            batch_logits = Predictor.classifier(batch_tensors).cpu().numpy()
+
+        predictions = []
+        confidences = []
+        for logits, exp_label in zip(batch_logits, exp_labels):
+            confidence, label = confidence_margin(logits, exp_label)
+            predictions.append(label)
+            confidences.append(confidence)
+
+        return predictions, confidences
 
 
 def confidence_margin(logits, exp_label):
@@ -61,4 +78,5 @@ def simple_confidence_margin(logits):
     print(f"softmax_probs: {softmax_probs}")
     # Get margin between top 2 normalized logits
     sorted_probs = np.sort(softmax_probs)[::-1]
-    return sorted_probs[0] - sorted_probs[1]
+    new_label = np.argmax(logits)
+    return sorted_probs[0] - sorted_probs[1], new_label

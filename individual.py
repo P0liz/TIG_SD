@@ -37,10 +37,11 @@ class Individual:
         self.misstep = 0
         self.bad_prediction = None
 
-    # TODO: why would I need this?
     def reset(self):
         self.id = Individual.COUNT
         self.members_distance = None
+        self.members_img_euc_dist = None
+        self.members_latent_cos_sim = None
         self.sparseness = None
         self.misclass = None
         self.aggregate_ff = None
@@ -125,9 +126,13 @@ class Individual:
                 self.m1.confidence, self.m2.confidence
             )
 
-            self.archive_candidate = (
-                self.m1.correctly_classified != self.m2.correctly_classified
-            )
+            if self.m1.correctly_classified != self.m2.correctly_classified:
+                self.archive_candidate = True
+                self.bad_prediction = (
+                    self.m1.predicted_label
+                    if not self.m1.correctly_classified
+                    else self.m2.predicted_label
+                )
 
         # Get the appropriate distance based on config
         distance_attr = {

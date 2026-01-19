@@ -182,8 +182,7 @@ class GeneticAlgorithm:
             individual (_type_): _description_
         """
         # Chose random member
-        flag = random.uniform(0, 1)
-        if flag < 0.5:
+        if random.getrandbits(1):
             member_to_mutate = individual.m1
             other_member = individual.m2
             ism1 = True
@@ -200,24 +199,7 @@ class GeneticAlgorithm:
         # Mutate and predict
         prompt = PROMPTS[member_to_mutate.expected_label]
         DigitMutator(member_to_mutate).mutate(prompt)
-        prediction, new_confidence = Predictor.predict_single(
-            member_to_mutate, member_to_mutate.expected_label
-        )
-
-        # If confidence diff is too low and the new confidence is higher then...
-        if (
-            abs(new_confidence - member_to_mutate.confidence) <= 0.01
-            and new_confidence >= member_to_mutate.confidence
-        ):
-            member_to_mutate.standing_steps += 1
-        else:
-            member_to_mutate.standing_steps = 0
-
-        member_to_mutate.predicted_label = prediction
-        member_to_mutate.confidence = new_confidence
-        member_to_mutate.correctly_classified = (
-            prediction == member_to_mutate.expected_label
-        )
+        individual.reset()
 
         # Update distances
         individual.members_distance = utils.get_distance(
@@ -254,15 +236,22 @@ class GeneticAlgorithm:
             return
         batch_labels = [m.expected_label for m in members_to_predict]
 
-        predictions, confidences = Predictor.predict_single(
-            members_to_predict, batch_labels
-        )
+        predictions, confidences = Predictor.predict(members_to_predict, batch_labels)
 
         # Assign results
         for member, pred, conf in zip(members_to_predict, predictions, confidences):
+            # If confidence diff is too low and the new confidence is higher then...
+            if abs(conf - member.confidence) <= 0.01 and conf >= member.confidence:
+                member.standing_steps += 1
+            else:
+                member.standing_steps = 0
+
             member.predicted_label = pred
             member.confidence = conf
-            member.correctly_classified = member.expected_label == pred
+            if member.expected_label == pred:
+                member.correctly_classified = True
+            else:
+                member.correctly_classified = False
 
     def evaluate_fitness(self, individuals):
         for ind in individuals:
