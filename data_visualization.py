@@ -44,7 +44,7 @@ def plot_confidence(confidences, save_path):
 
     # Plot confidence scores
     ax.plot(confidences, color="b")
-    ax.set_xlabel("Iteration")
+    ax.set_xlabel("Mutations")
     ax.set_ylabel("Confidence Score")
     ax.tick_params("y")
 

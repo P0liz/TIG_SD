@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import evaluator
 from folder import Folder
+from data_visualization import plot_confidence, plot_distance
 
 
 class Individual:
@@ -20,8 +21,11 @@ class Individual:
         self.prompt = prompt
         self.original_noise = latent
         self.members_distance = 0
+        self.members_distances = []
         self.members_img_euc_dist = 0
+        self.members_img_euc_dists = []
         self.members_latent_cos_sim = 1
+        self.members_latent_cos_sims = []
         self.sparseness = None
         self.misclass = None
         self.aggregate_ff = None
@@ -68,9 +72,10 @@ class Individual:
 
         # --- Helper to save a member ---
         def save_member(member, idx):
-            base_name = f"archived_{idx}_mem{idx}_l_{member.predicted_label}"
+            base_name = f"archived_mem{idx}_l_{member.predicted_label}"
             png_path = join(ind_dir, base_name + ".png")
             npy_path = join(ind_dir, base_name + ".npy")
+            conf_path = join(ind_dir, base_name + "_conf.png")
 
             img_np = member.image_tensor.detach().cpu().numpy().squeeze()
 
@@ -81,12 +86,31 @@ class Individual:
             # Save raw tensor (scientific)
             np.save(npy_path, img_np)
 
+            # Save confidence plot
+            plot_confidence(member.confidence_history, conf_path)
+
             # Consistency check
             assert np.array_equal(img_np, np.load(npy_path))
 
         # Save members
         save_member(self.m1, idx=1)
         save_member(self.m2, idx=2)
+
+        # Plotting distances
+        dist_path = join(ind_dir, "members_distance.png")
+        dist_img_path = join(ind_dir, "members_img_euc_dist.png")
+        cos_sim_path = join(ind_dir, "members_latent_cos_sim.png")
+        plot_distance(self.members_distances, dist_path, "Members Distance")
+        plot_distance(
+            self.members_img_euc_dists,
+            dist_img_path,
+            "Members Image Euclidean Distance",
+        )
+        plot_distance(
+            self.members_latent_cos_sims,
+            cos_sim_path,
+            "Members Latent Cosine Similarity",
+        )
 
     """ old version
     def export(self):
@@ -120,6 +144,8 @@ class Individual:
         assert (np.array_equal(img_np,
                                np.load(filename2 + '.npy')))
     """
+
+    # Stuff below currently not used
 
     def evaluate(self, archive):
         self.sparseness = None

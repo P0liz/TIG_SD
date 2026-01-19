@@ -1,4 +1,5 @@
 import torch
+import math
 
 DJ_DEBUG = 1
 
@@ -10,7 +11,7 @@ STEPSIZE = 10
 RESEEDUPPERBOUND = 3  # Reseeding moderato
 
 # Archive configuration
-ARCHIVE_THRESHOLD = 4.0
+ARCHIVE_THRESHOLD = math.INFINITY  # Disabilitato per ora
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # O 'time'
 
@@ -33,6 +34,7 @@ MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 LORA_PATH = "./SD_weights"
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
 DELTA = 0.04  # Old value 0.025
+STANDING_STEP_LIMIT = 3
 NOISE_SCALE = 0.025  # Circular walk
 
 # Torch settings

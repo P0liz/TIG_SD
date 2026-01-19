@@ -1,6 +1,6 @@
 from math import exp
 import mutation_manager
-from config import DELTA
+from config import DELTA, STANDING_STEP_LIMIT
 
 
 class DigitMutator:
@@ -17,10 +17,10 @@ class DigitMutator:
         """
         # def mutate(self, prompt, step, noise_x, noise_y): # Circular walk
         # Progressive intensification of perturbation size
-        # It is increased by one time every 5 standing steps
+        # It is increased by one time every STANDING_STEP_LIMIT standing steps
         base_delta = DELTA
-        if self.digit.standing_steps >= 5:
-            base_delta = DELTA * (self.digit.standing_steps / 5 + 1)
+        if self.digit.standing_steps >= STANDING_STEP_LIMIT:
+            base_delta = DELTA * (self.digit.standing_steps / STANDING_STEP_LIMIT + 1)
         # perturbation_size = base_delta * exp(self.digit.confidence)   # Old method
         perturbation_size = base_delta  # understand if this should change
         print(f"perturbation_size: {perturbation_size}")

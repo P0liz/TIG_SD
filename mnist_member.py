@@ -20,6 +20,7 @@ class MnistMember:
         self.expected_label = expected_label
         self.predicted_label = None
         self.confidence = None
+        self.confidence_history = []
         self.correctly_classified = None
         self.standing_steps = 0
         MnistMember.COUNT += 1

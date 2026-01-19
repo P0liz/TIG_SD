@@ -112,7 +112,7 @@ def mutate(z_orig, perturbation_size):
     Returns:
         z_mut: torch.Tensor - latent mutato
     """
-    epsilon = torch.rand_like(z_orig)  # ε ~ N(0, I) noise
+    epsilon = torch.randn_like(z_orig)  # randn to have ε ~ N(0, I) noise
     z_mut = z_orig + perturbation_size * epsilon
     return z_mut
 

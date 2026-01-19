@@ -184,11 +184,16 @@ class GeneticAlgorithm:
         if flag < 0.5:
             member_to_mutate = individual.m1
             other_member = individual.m2
+            ism1 = True
         else:
             member_to_mutate = individual.m2
             other_member = individual.m1
+            ism1 = False
 
-        # TODO: add plotting
+        if ism1:
+            individual.m1.confidence_history.append(member_to_mutate.confidence)
+        else:
+            individual.m2.confidence_history.append(member_to_mutate.confidence)
 
         # Mutate and predict
         prompt = PROMPTS[member_to_mutate.expected_label]
@@ -218,6 +223,9 @@ class GeneticAlgorithm:
         individual.members_latent_cos_sim = member_to_mutate.cosine_similarity(
             other_member
         )
+        individual.members_distances.append(individual.members_distance)
+        individual.members_img_euc_dists.append(individual.members_img_euc_dist)
+        individual.members_latent_cos_sims.append(individual.members_latent_cos_sim)
 
     # ========================================================================
     # Evaluation
