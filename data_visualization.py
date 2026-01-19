@@ -1,4 +1,4 @@
-from PIL import Image  # Actually Needed to export_as_gif
+from PIL import Image
 import matplotlib.pyplot as plt
 
 

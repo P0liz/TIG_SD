@@ -7,7 +7,6 @@ from timer import Timer
 from utils import get_distance, get_diameter, get_radius_reference
 from evaluator import eval_archive_dist
 import numpy as np
-import torch
 
 from config import (
     ARCHIVE_THRESHOLD,
@@ -20,6 +19,7 @@ from config import (
     RUNTIME,
     REPORT_NAME,
     STEPSIZE,
+    DISTANCE_METRIC,
 )
 
 
@@ -28,6 +28,11 @@ class Archive:
     def __init__(self):
         self.archive = list()
         self.archived_labels = set()
+        self.distance_input = {
+            "latent_euclidean": "members_distance",
+            "image_euclidean": "members_img_euc_dist",
+            "latent_cosine": "members_latent_cos_sim",
+        }[DISTANCE_METRIC]
 
     def get_archive(self):
         return self.archive
@@ -53,10 +58,13 @@ class Archive:
                 # Note: 'close' is defined according to a user-defined threshold
                 if d_min <= ARCHIVE_THRESHOLD:
                     # The candidate replaces the closest archive member if its members' distance is better
-                    dist_ind = ind.members_distance
+                    print(
+                        "Candidate is close to an existing archive member, updating archive..."
+                    )
+                    dist_ind = getattr(ind, self.distance_input)
                     dist_archived_ind = get_distance(
-                        closest_archived.m1.image_tensor,
-                        closest_archived.m2.image_tensor,
+                        closest_archived.m1,
+                        closest_archived.m2,
                     )
                     if dist_ind <= dist_archived_ind:
                         self.archive.remove(closest_archived)
@@ -64,9 +72,11 @@ class Archive:
                         self.archived_labels.add(ind.prompt)
                 else:
                     # Add the candidate to the archive if it is distant from all the other archive members
+                    print("Adding new member to the archive...")
                     self.archive.append(ind)
                     self.archived_labels.add(ind.prompt)
 
+    # TODO: review the entire method
     def create_report(self, labels, generation):
         # Retrieve the solutions belonging to the archive.
         if generation == STEPSIZE:
@@ -82,7 +92,7 @@ class Archive:
                         "iteration",
                         "timestamp",
                         "archive_len",
-                        "sparseness",
+                        # "sparseness",
                         "total_seeds",
                         "covered_seeds",
                         "final seeds",
@@ -90,8 +100,8 @@ class Archive:
                         "members_dist_max",
                         "members_dist_avg",
                         "members_dist_std",
-                        "radius_ref_out",
-                        "radius_ref_in",
+                        # "radius_ref_out",
+                        # "radius_ref_in",
                         "diameter_out",
                         "diameter_in",
                         "iteration",
@@ -114,6 +124,7 @@ class Archive:
             outer_frontier.append(misclassified_member)
             inner_frontier.append(correct_member)
 
+        """ sparsness of members ??? (not individuals?)
         avg_sparseness = 0
         if n > 1:
             # Calculate sparseness of the solutions
@@ -123,12 +134,11 @@ class Archive:
                 sumdistances = 0
                 for dig2 in outer_frontier:
                     if dig1 != dig2:
-                        sumdistances += torch.linalg.norm(
-                            dig1.image_tensor - dig2.image_tensor
-                        ).item()
+                        sumdistances += get_distance(dig1, dig2)
                 dig1.sparseness = sumdistances / (n - 1)
                 sumsparseness += dig1.sparseness
             avg_sparseness = sumsparseness / n
+        """
 
         out_radius = None
         in_radius = None
@@ -186,7 +196,7 @@ class Archive:
                     str(generation),
                     str(elapsed_time),
                     str(n),
-                    str(avg_sparseness),
+                    # str(avg_sparseness),
                     str(len(labels)),
                     str(len(self.archived_labels)),
                     str(len(final_seeds)),
@@ -213,7 +223,7 @@ class Archive:
         distances = list()
         stats = [None] * 4
         for ind in self.get_archive():
-            distances.append(ind.members_distance)
+            distances.append(getattr(ind, self.distance_input))
 
         stats[0] = np.min(distances)
         stats[1] = np.max(distances)

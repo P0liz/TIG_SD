@@ -9,6 +9,8 @@ import matplotlib.cm as cm
 import evaluator
 from folder import Folder
 from data_visualization import plot_confidence, plot_distance
+from config import DISTANCE_METRIC
+import utils
 
 
 class Individual:
@@ -21,11 +23,11 @@ class Individual:
         self.prompt = prompt
         self.original_noise = latent
         self.members_distance = 0
-        self.members_distances = []
+        self.members_distances = [0]
         self.members_img_euc_dist = 0
-        self.members_img_euc_dists = []
-        self.members_latent_cos_sim = 1
-        self.members_latent_cos_sims = []
+        self.members_img_euc_dists = [0]
+        self.members_latent_cos_sim = 0
+        self.members_latent_cos_sims = [0]
         self.sparseness = None
         self.misclass = None
         self.aggregate_ff = None
@@ -100,7 +102,9 @@ class Individual:
         dist_path = join(ind_dir, "members_distance.png")
         dist_img_path = join(ind_dir, "members_img_euc_dist.png")
         cos_sim_path = join(ind_dir, "members_latent_cos_sim.png")
-        plot_distance(self.members_distances, dist_path, "Members Distance")
+        plot_distance(
+            self.members_distances, dist_path, "Members Latent Euclidean Distance"
+        )
         plot_distance(
             self.members_img_euc_dists,
             dist_img_path,
@@ -111,41 +115,6 @@ class Individual:
             cos_sim_path,
             "Members Latent Cosine Similarity",
         )
-
-    """ old version
-    def export(self):
-        if not exists(Folder.DST_IND):
-            makedirs(Folder.DST_IND)
-        dst = join(Folder.DST_IND, "ind"+str(self.id))
-        data = self.to_dict()
-        filedest = dst + ".json"
-        with open(filedest, 'w') as f:
-            (json.dump(data, f, sort_keys=True, indent=4))
-        # Save member images and latents
-        filename1 = join(dst, basename(
-            'archived_' + str(1) +
-            '_mem1_l_' + str(self.m1.predicted_label)))
-        img_np = self.m1.image_tensor.detach().cpu().numpy()
-        plt.imsave(filename1, img_np,
-                   cmap=cm.gray,
-                   format='png')
-        np.save(filename1, img_np)
-        assert (np.array_equal(img_np,
-                               np.load(filename1 + '.npy')))
-
-        filename2 = join(dst, basename(
-            'archived_' + str(2) +
-            '_mem2_l_' + str(self.m2.predicted_label)))
-        img_np = self.m2.image_tensor.detach().cpu().numpy()
-        plt.imsave(filename2, img_np,
-                   cmap=cm.gray,
-                   format='png')
-        np.save(filename2, img_np)
-        assert (np.array_equal(img_np,
-                               np.load(filename2 + '.npy')))
-    """
-
-    # Stuff below currently not used
 
     def evaluate(self, archive):
         self.sparseness = None
@@ -160,11 +129,16 @@ class Individual:
                 self.m1.correctly_classified != self.m2.correctly_classified
             )
 
-        if self.members_distance is None:
+        # Get the appropriate distance based on config
+        distance_attr = {
+            "latent_euclidean": "members_distance",
+            "image_euclidean": "members_img_euc_dist",
+            "latent_cosine": "members_latent_cos_sim",
+        }[DISTANCE_METRIC]
+
+        if getattr(self, distance_attr) is None:
             # Calculate fitness function 1
-            self.members_distance = evaluator.evaluate_ff1(
-                self.m1.purified, self.m2.purified
-            )
+            setattr(self, distance_attr, utils.get_distance(self.m1, self.m2))
 
         # Recalculate sparseness at each iteration
         self.sparseness = evaluator.evaluate_sparseness(self, archive)
@@ -173,7 +147,7 @@ class Individual:
             print("BUG")
 
         self.aggregate_ff = evaluator.evaluate_aggregate_ff(
-            self.sparseness, self.members_distance
+            self.sparseness, getattr(self, distance_attr)
         )
 
         return self.aggregate_ff, self.misclass
@@ -181,6 +155,7 @@ class Individual:
     def mutate(self):
         raise NotImplemented()
 
+    # Generic distance between two individuals
     def distance(self, i2):
         i1 = self
         a = i1.m1.distance(i2.m1)

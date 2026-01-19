@@ -9,13 +9,13 @@ class DigitMutator:
         self.digit = digit
 
     def mutate(self, prompt):
+        # def mutate(self, prompt, step, noise_x, noise_y): # Circular walk
         """
         Mutate the member assigning a delta value based on the number of standing steps
         The higher the standing steps, the higher the delta
         Args:
             prompt (_type_): _description_
         """
-        # def mutate(self, prompt, step, noise_x, noise_y): # Circular walk
         # Progressive intensification of perturbation size
         # It is increased by one time every STANDING_STEP_LIMIT standing steps
         base_delta = DELTA

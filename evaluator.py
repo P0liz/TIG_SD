@@ -8,7 +8,6 @@ def evaluate_ff1(A, B):
     return dist
 
 
-# calculate the misclassification ff
 def evaluate_ff2(confidence1, confidence2):
     P3 = confidence1 * confidence2
 
@@ -58,21 +57,23 @@ def evaluate_sparseness(ind, individuals):
     return sparseness
 
 
+# Distance between two individuals for archive management
+# This is different from the generic distance method in individual.py
+# It considers the correctly classified and misclassified members separately
 def eval_archive_dist(ind1, ind2):
-
     if ind1.m1.predicted_label == ind1.m1.expected_label:
-        ind1_correct = ind1.m1.image_tensor
-        ind1_misclass = ind1.m2.image_tensor
+        ind1_correct = ind1.m1
+        ind1_misclass = ind1.m2
     else:
-        ind1_correct = ind1.m2.image_tensor
-        ind1_misclass = ind1.m1.image_tensor
+        ind1_correct = ind1.m2
+        ind1_misclass = ind1.m1
 
-    if ind2.m1.predicted_label == ind1.m2.expected_label:
-        ind2_correct = ind2.m1.image_tensor
-        ind2_misclass = ind2.m2.image_tensor
+    if ind2.m1.predicted_label == ind2.m1.expected_label:
+        ind2_correct = ind2.m1
+        ind2_misclass = ind2.m2
     else:
-        ind2_correct = ind2.m2.image_tensor
-        ind2_misclass = ind2.m1.image_tensor
+        ind2_correct = ind2.m2
+        ind2_misclass = ind2.m1
 
     dist1 = utils.get_distance(ind1_correct, ind2_correct)
     dist2 = utils.get_distance(ind1_misclass, ind2_misclass)

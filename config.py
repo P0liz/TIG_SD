@@ -1,19 +1,20 @@
 import torch
-import math
+import numpy as np
 
 DJ_DEBUG = 1
 
 # Popolazione e generazioni
-POPSIZE = 20  # Ridotto rispetto al secondo codice (SD è costoso)
+POPSIZE = 12  # Must be divisible by 4
 NGEN = 50
-INITIALPOP = "random"  # O 'seeded' per esplorare tutte le label
+INITIALPOP = "random"  # TODO: implement different initialization methods
 STEPSIZE = 10
 RESEEDUPPERBOUND = 3  # Reseeding moderato
 
 # Archive configuration
-ARCHIVE_THRESHOLD = math.INFINITY  # Disabilitato per ora
+ARCHIVE_THRESHOLD = np.inf  # Disabilitato per ora
 REPORT_NAME = "stats.csv"
-STOP_CONDITION = "iter"  # O 'time'
+STOP_CONDITION = "iter"  # Or 'time'
+DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
 
 # Timer
 RUNTIME = 3600
@@ -53,4 +54,4 @@ WIDTH = 512
 
 # Dev testing
 TRYNEW = False
-MUTATION_TYPE = "single_random"  # O "single_conf" # O 'dual'
+MUTATION_TYPE = "single_random"  # Or "single_conf" # Or 'dual'

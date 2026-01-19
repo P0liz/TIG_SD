@@ -14,6 +14,7 @@ from digit_mutator import DigitMutator
 from predictor import Predictor
 from timer import Timer
 import archive_manager
+import utils
 from individual import Individual
 from mutation_manager import get_pipeline
 from config import (
@@ -55,8 +56,7 @@ Individual.USED_LABELS = set()
 
 class GeneticAlgorithm:
 
-    def __init__(self, mutation_type="single", rand_seed=None):
-        self.mutation_type = mutation_type
+    def __init__(self, rand_seed=None):
         self.archive = archive_manager.Archive()
 
         # Keep deterministic outputs
@@ -176,6 +176,8 @@ class GeneticAlgorithm:
     def mutate_individual(self, individual):
         """
         Mutate a single digit chosen randomly and keep the mutation either way it goes
+        Keep track of standing steps to increase mutation size if needed
+        Save confidence history and distances for plotting
         Args:
             individual (_type_): _description_
         """
@@ -218,10 +220,14 @@ class GeneticAlgorithm:
         )
 
         # Update distances
-        individual.members_distance = member_to_mutate.distance(other_member)
-        individual.members_img_euc_dist = member_to_mutate.image_distance(other_member)
-        individual.members_latent_cos_sim = member_to_mutate.cosine_similarity(
-            other_member
+        individual.members_distance = utils.get_distance(
+            member_to_mutate, other_member, "latent_euclidean"
+        )
+        individual.members_img_euc_dist = utils.get_distance(
+            member_to_mutate, other_member, "image_euclidean"
+        )
+        individual.members_latent_cos_sim = utils.get_distance(
+            member_to_mutate, other_member, "latent_cosine"
         )
         individual.members_distances.append(individual.members_distance)
         individual.members_img_euc_dists.append(individual.members_img_euc_dist)
@@ -266,8 +272,18 @@ class GeneticAlgorithm:
     def clone_individual(self, individual):
         # Clone an individual (deep copy)
         # Use the new constructor to include the fitness field
-        new_ind = creator.Individual(individual.m1.clone(), individual.m2.clone())
+        new_ind = creator.Individual(
+            individual.m1.clone(),
+            individual.m2.clone(),
+            individual.prompt,
+            individual.original_noise.clone(),
+        )
         new_ind.members_distance = individual.members_distance
+        new_ind.members_img_euc_dist = individual.members_img_euc_dist
+        new_ind.members_latent_cos_sim = individual.members_latent_cos_sim
+        new_ind.members_distances = list(individual.members_distances)
+        new_ind.members_img_euc_dists = list(individual.members_img_euc_dists)
+        new_ind.members_latent_cos_sims = list(individual.members_latent_cos_sims)
         new_ind.prompt = individual.prompt
         return new_ind
 
@@ -367,6 +383,7 @@ class GeneticAlgorithm:
             self.evaluate_batch(all_individuals)
             self.evaluate_fitness(all_individuals)
             self.update_archive(all_individuals)
+            print(f"Archive size: {len(self.archive.get_archive())}")
 
             # 5. Survival selection (NSGA-II)
             # Using len(population) because it could differ from POPSIZE (in case of reseeding)
@@ -411,7 +428,7 @@ if __name__ == "__main__":
     Folder.initialize()
 
     # Crea e esegui GA
-    ga = GeneticAlgorithm(mutation_type="single", rand_seed=42)
+    ga = GeneticAlgorithm(rand_seed=7)
     population, archive = ga.run()
 
     # Report finale

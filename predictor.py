@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 from mnist_classifier.model_mnist import MnistClassifier
-from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH, TRYNEW
+from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH
 
 
 class Predictor:
@@ -20,22 +20,15 @@ class Predictor:
     print("Loaded classifier")
 
     def predict_single(dig, exp_label):
-        # img_detached = img.detach()
         new_logits = (
             Predictor.classifier(dig.image_tensor).squeeze().detach().cpu().numpy()
         )
 
-        # 1) was just applying softmax to the logits and getting the higher one
-
-        # 2) margin between top logits as confidence score
+        # Margin between top logits as confidence score
         # label = np.argmax(new_logits)
         # confidence = simple_confidence_margin(new_logits)
         confidence, label = confidence_margin(new_logits, exp_label)
 
-        # 3) Using distance in latent space as confidence measure
-        # confidence = torch.linalg.norm(dig.latent - ref.latent).item()
-        # normalized_conf = torch.sigmoid(torch.tensor(confidence)).item()
-        # label = np.argmax(new_logits)
         return label, confidence
 
 
@@ -64,7 +57,7 @@ def confidence_margin(logits, exp_label):
 
 def simple_confidence_margin(logits):
     logits_tensor = torch.from_numpy(logits).float()
-    softmax_probs = torch.softmax(logits_tensor, dim=0).numpy()
+    softmax_probs = torch.softmax(logits_tensor, dim=0).numpy()  # Normalize logits
     print(f"softmax_probs: {softmax_probs}")
     # Get margin between top 2 normalized logits
     sorted_probs = np.sort(softmax_probs)[::-1]

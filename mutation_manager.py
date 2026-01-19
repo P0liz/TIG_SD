@@ -12,15 +12,11 @@ from config import (
     LORA_WEIGHTS,
     DTYPE,
     VARIANT,
-    TRYNEW,
     STEPS,
     NOISE_SCALE,
 )
 from diffusers import StableDiffusionPipeline
 from diffusers.schedulers import DDIMScheduler
-
-# Extras
-# import keras_cv
 
 
 # Using Stable diffusion pipeline
@@ -66,25 +62,6 @@ class SDPipelineManager:
         print("Pipeline ready for inference")
         return self._pipe
 
-        # Using diffusion library
-        # cond_latent, image = diffusion.generate(prompt, mutate = mutate, mutated_latent = mutated_latent)
-        # return cond_latent, image
-
-        # Using KerasCV Stable Diffusion model
-        # NOT ENOUGH MEMORY
-        """
-        model = keras_cv.models.StableDiffusion(jit_compile=True)
-
-        image = model.generate_image(
-            prompt,
-            batch_size=1,
-            num_steps=10,       
-            diffusion_noise=mutated_latent,
-        )
-
-        return mutated_latent, image
-        """
-
     def get_pipe(self):
         """Ottieni la pipeline (inizializza se necessario)"""
         if not self._initialized:
@@ -117,6 +94,7 @@ def mutate(z_orig, perturbation_size):
     return z_mut
 
 
+# Circular walk mutation
 def mutate_circular(
     z_orig, step, noise_x, noise_y, total_steps=STEPS, noise_scale=NOISE_SCALE
 ):
