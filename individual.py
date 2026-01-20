@@ -1,3 +1,4 @@
+# %%writefile individual.py
 import json
 from os import makedirs
 from os.path import join
@@ -36,6 +37,7 @@ class Individual:
         self.m2 = member2
         self.misstep = 0
         self.bad_prediction = None
+        Individual.COUNT += 1
 
     def reset(self):
         self.id = Individual.COUNT

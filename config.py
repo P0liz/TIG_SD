@@ -1,3 +1,4 @@
+# %%writefile config.py
 import torch
 import numpy as np
 
@@ -11,7 +12,7 @@ STEPSIZE = 10
 RESEEDUPPERBOUND = 3  # Reseeding moderato
 
 # Archive configuration
-ARCHIVE_THRESHOLD = 0  # Disabilitato per ora
+ARCHIVE_THRESHOLD = 6  # Disabilitato per ora
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
@@ -32,7 +33,8 @@ IMG_SIZE = 28
 
 # Stable Diffusion
 MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
-LORA_PATH = "./SD_weights"
+# LORA_PATH = "./SD_weights"
+LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
 DELTA = 0.08  # Old method value 0.025  # std value 0.04
 STANDING_STEP_LIMIT = 3

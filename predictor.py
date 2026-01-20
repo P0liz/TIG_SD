@@ -1,3 +1,4 @@
+# %%writefile predictor.py
 import numpy as np
 import torch
 
@@ -19,9 +20,9 @@ class Predictor:
     classifier.eval()
     print("Loaded classifier")
 
-    def predict_single(dig, exp_label):
+    def predict_single(member, exp_label):
         with torch.no_grad():
-            logits = Predictor.classifier(dig.image_tensor).squeeze().cpu().numpy()
+            logits = Predictor.classifier(member.image_tensor).squeeze().cpu().numpy()
 
         # Margin between the 2 top logits as confidence score
         # confidence, label = simple_confidence_margin(logits)
@@ -32,9 +33,9 @@ class Predictor:
         return label, confidence
 
     def predict(members, exp_labels):
-        batch_tensors = torch.stack([member.image_tensor for member in members]).to(
-            DEVICE
-        )
+        batch_tensors = torch.stack(
+            [member.image_tensor.squeeze(0) for member in members]
+        ).to(DEVICE)
 
         with torch.no_grad():
             batch_logits = Predictor.classifier(batch_tensors).cpu().numpy()

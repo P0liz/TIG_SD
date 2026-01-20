@@ -1,3 +1,4 @@
+# %%writefile archive_manager.py
 import csv
 import json
 from os.path import join
@@ -52,6 +53,7 @@ class Archive:
                     if distance_archived < d_min:
                         closest_archived = self.archive[i]
                         d_min = distance_archived
+                        print(f"New min distance: {d_min}")
                     i += 1
                 # Decide whether to add the candidate to the archive
                 # Verify whether the candidate is close to the existing member of the archive

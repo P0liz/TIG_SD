@@ -1,3 +1,4 @@
+# %%writefile main.py
 import random
 import numpy as np
 import torch
@@ -50,7 +51,6 @@ creator.create("FitnessMulti", base.Fitness, weights=(1.0, -1.0))
 creator.create("Individual", Individual, fitness=creator.FitnessMulti)
 
 # Global individual variables
-Individual.COUNT = 0
 Individual.USED_LABELS = set()
 
 
@@ -112,7 +112,6 @@ class GeneticAlgorithm:
         Returns:
             new basic individual, composed a couple of members
         """
-        Individual.COUNT += 1
 
         if label is None:
             label = random.randint(0, 9)
@@ -160,7 +159,7 @@ class GeneticAlgorithm:
                 population.append(ind)
 
                 print(
-                    f"  [{i+1}/{size}] label={ind.m1.expected_label}, "
+                    f"  [{i+1}/{size}] label={ind.m1.predicted_label}, "
                     f"conf={ind.m1.confidence:.3f}"
                 )
 
@@ -240,18 +239,17 @@ class GeneticAlgorithm:
 
         # Assign results
         for member, pred, conf in zip(members_to_predict, predictions, confidences):
-            # If confidence diff is too low and the new confidence is higher then...
-            if abs(conf - member.confidence) <= 0.01 and conf >= member.confidence:
-                member.standing_steps += 1
-            else:
-                member.standing_steps = 0
-
             member.predicted_label = pred
             member.confidence = conf
             if member.expected_label == pred:
                 member.correctly_classified = True
             else:
                 member.correctly_classified = False
+            # If confidence diff is too low and the new confidence is higher then...
+            if abs(conf - member.confidence) <= 0.01 and conf >= member.confidence:
+                member.standing_steps += 1
+            else:
+                member.standing_steps = 0
 
     def evaluate_fitness(self, individuals):
         for ind in individuals:
@@ -308,6 +306,7 @@ class GeneticAlgorithm:
         return population
 
     def update_archive(self, individuals):
+        print(f"{len(individuals)} new archive candidates to evaluate...")
         for ind in individuals:
             if ind.archive_candidate:
                 self.archive.update_archive(ind)
@@ -363,7 +362,8 @@ class GeneticAlgorithm:
 
             # 3. Mutation
             print(f"Mutating {len(offspring)} offspring...")
-            for ind in offspring:
+            for i, ind in enumerate(offspring):
+                print(f"[{i+1}/{len(offspring)}]")
                 self.mutate_individual(ind)
                 del ind.fitness.values
 
@@ -422,11 +422,8 @@ if __name__ == "__main__":
 
     # Report finale
     print("\n### FINAL ARCHIVE")
-    from utils import print_archive, print_archive_experiment
+    from utils import print_archive_experiment
 
-    # TODO: change how an ind is saved (atm doubled info)
     print_archive_experiment(archive.get_archive())
-    # TODO: why both functions?
-    # print_archive(archive.get_archive())
 
     print("GAME OVER")
