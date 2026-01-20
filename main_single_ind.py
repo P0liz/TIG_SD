@@ -1,3 +1,4 @@
+# %%writer main_single_ind.py
 import torch
 import random
 import re
@@ -9,7 +10,7 @@ from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 from mutation_manager import get_pipeline
 from data_visualization import export_as_gif, plot_confidence, plot_distance
-from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, STEPS, MUTATION_TYPE
+from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, NGEN, MUTATION_TYPE
 
 
 # Mutate only the one with the lower confidence and keep the mutation only if it is better (lower)
@@ -139,7 +140,7 @@ def dual_mutation(
         return prediction2, confidence2, digit2, digit1
 
 
-def main(prompt, expected_label, max_steps=STEPS):
+def main(prompt, expected_label, max_steps=NGEN):
     # Force finding a valid initial latent
     while True:
         # Starting from a random latent noise vector

@@ -1,11 +1,10 @@
+# %%writefile mnist_member.py
 import utils
 
 
 class MnistMember:
-    COUNT = 0
 
     def __init__(self, latent, expected_label):
-        self.id = MnistMember.COUNT
         self.image = None  # PIL Image in rgb
         self.image_tensor = None  # Torch Tensor [1, 1, 28, 28] in grayscale
         self.latent = latent
@@ -15,16 +14,16 @@ class MnistMember:
         self.confidence_history = []  # for plotting confidence over time
         self.correctly_classified = None
         self.standing_steps = 0
-        MnistMember.COUNT += 1
 
     def clone(self):
-        clone_digit = MnistMember(self.latent, self.expected_label)
-        clone_digit.image = self.image
-        clone_digit.image_tensor = self.image_tensor
-        clone_digit.predicted_label = self.predicted_label
-        clone_digit.confidence = self.confidence
-        clone_digit.correctly_classified = self.correctly_classified
-        return clone_digit
+        clone_member = MnistMember(self.latent, self.expected_label)
+        clone_member.image = self.image
+        clone_member.image_tensor = self.image_tensor
+        clone_member.predicted_label = self.predicted_label
+        clone_member.confidence = self.confidence
+        clone_member.confidence_history = list(self.confidence_history)  # deep copy
+        clone_member.correctly_classified = self.correctly_classified
+        return clone_member
 
     def reset(self):
         self.predicted_label = None

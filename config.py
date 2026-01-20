@@ -5,8 +5,8 @@ import numpy as np
 DJ_DEBUG = 1
 
 # Popolazione e generazioni
-POPSIZE = 4  # Must be divisible by 4   # std value 20
-NGEN = 30  # Number of generations     # std value 100
+POPSIZE = 20  # Must be divisible by 4   # std value 20
+NGEN = 100  # Number of generations     # std value 100
 INITIALPOP = "random"  # TODO: implement different initialization methods
 STEPSIZE = 10
 RESEEDUPPERBOUND = 3  # Reseeding moderato
@@ -24,8 +24,6 @@ RUNTIME = 3600
 K_SD = 0.1
 K = 1
 
-# Iterations
-STEPS = 100
 
 # Classifier
 CLASSIFIER_WEIGHTS_PATH = "./mnist_classifier/weight/MNIST_conv_classifier.pth"
@@ -36,9 +34,11 @@ MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 # LORA_PATH = "./SD_weights"
 LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
-DELTA = 0.08  # Old method value 0.025  # std value 0.04
+DELTA = 0.04  # Old method value 0.025  # std value 0.04
 STANDING_STEP_LIMIT = 3
-NOISE_SCALE = 0.025  # Circular walk
+# Circular walk
+NOISE_SCALE = 0.025
+CIRC_STEPS = 100
 
 # Torch settings
 if torch.cuda.is_available():

@@ -28,7 +28,7 @@ class Archive:
 
     def __init__(self):
         self.archive = list()
-        self.archived_labels = set()
+        self.archived_prompts = set()
         self.distance_input = {
             "latent_euclidean": "members_distance",
             "image_euclidean": "members_img_euc_dist",
@@ -42,7 +42,8 @@ class Archive:
         if ind not in self.archive:
             if len(self.archive) == 0:
                 self.archive.append(ind)
-                self.archived_labels.add(ind.prompt)
+                self.archived_prompts.add(ind.prompt)
+                print("Added first member to the archive")
             else:
                 # Find the member of the archive that is closest to the candidate.
                 closest_archived = None
@@ -71,12 +72,12 @@ class Archive:
                     if dist_ind <= dist_archived_ind:
                         self.archive.remove(closest_archived)
                         self.archive.append(ind)
-                        self.archived_labels.add(ind.prompt)
+                        self.archived_prompts.add(ind.prompt)
                 else:
                     # Add the candidate to the archive if it is distant from all the other archive members
                     print("Adding new member to the archive...")
                     self.archive.append(ind)
-                    self.archived_labels.add(ind.prompt)
+                    self.archived_prompts.add(ind.prompt)
 
     # TODO: review the entire method
     def create_report(self, labels, generation):
@@ -106,7 +107,6 @@ class Archive:
                         # "radius_ref_in",
                         "diameter_out",
                         "diameter_in",
-                        "iteration",
                     ]
                 )
         solution = [ind for ind in self.archive]
@@ -200,7 +200,7 @@ class Archive:
                     str(n),
                     # str(avg_sparseness),
                     str(len(labels)),
-                    str(len(self.archived_labels)),
+                    str(len(self.archived_prompts)),
                     str(len(final_seeds)),
                     str(stats[0]),
                     str(stats[1]),

@@ -20,6 +20,7 @@ class Individual:
     USED_LABELS = set()
 
     def __init__(self, member1, member2, prompt, latent):
+        Individual.COUNT += 1
         self.id = Individual.COUNT
         self.prompt = prompt
         self.original_noise = latent
@@ -37,10 +38,9 @@ class Individual:
         self.m2 = member2
         self.misstep = 0
         self.bad_prediction = None
-        Individual.COUNT += 1
 
     def reset(self):
-        self.id = Individual.COUNT
+        # do not reset id (same throughout life)
         self.members_distance = None
         self.members_img_euc_dist = None
         self.members_latent_cos_sim = None
@@ -119,7 +119,7 @@ class Individual:
             "Members Latent Cosine Similarity",
         )
 
-    def evaluate(self, archive):
+    def evaluate(self, archive, step):
         self.sparseness = None
 
         if self.misclass is None:
@@ -130,6 +130,7 @@ class Individual:
 
             if self.m1.correctly_classified != self.m2.correctly_classified:
                 self.archive_candidate = True
+                self.misstep = step
                 self.bad_prediction = (
                     self.m1.predicted_label
                     if not self.m1.correctly_classified

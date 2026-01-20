@@ -1,3 +1,4 @@
+# %%writer digit_mutator.py
 from math import exp
 import mutation_manager
 from config import DELTA, STANDING_STEP_LIMIT
@@ -23,7 +24,6 @@ class DigitMutator:
             base_delta = DELTA * (self.digit.standing_steps / STANDING_STEP_LIMIT + 1)
         # perturbation_size = base_delta * exp(self.digit.confidence)   # Old method
         perturbation_size = base_delta  # understand if this should change
-        print(f"perturbation_size: {perturbation_size}")
 
         # Mutazione nel latent space
         mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size)

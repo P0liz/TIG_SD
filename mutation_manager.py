@@ -1,3 +1,4 @@
+# %%writer mutation_manager.py
 from PIL import Image
 import numpy as np
 import cv2
@@ -12,7 +13,7 @@ from config import (
     LORA_WEIGHTS,
     DTYPE,
     VARIANT,
-    STEPS,
+    CIRC_STEPS,
     NOISE_SCALE,
 )
 from diffusers import StableDiffusionPipeline
@@ -96,7 +97,7 @@ def mutate(z_orig, perturbation_size):
 
 # Circular walk mutation
 def mutate_circular(
-    z_orig, step, noise_x, noise_y, total_steps=STEPS, noise_scale=NOISE_SCALE
+    z_orig, step, noise_x, noise_y, total_steps=CIRC_STEPS, noise_scale=NOISE_SCALE
 ):
     """
     Muta il latent seguendo un punto specifico del percorso circolare

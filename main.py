@@ -190,15 +190,17 @@ class GeneticAlgorithm:
             other_member = individual.m1
             ism1 = False
 
+        """
         if ism1:
             individual.m1.confidence_history.append(member_to_mutate.confidence)
         else:
             individual.m2.confidence_history.append(member_to_mutate.confidence)
+        """
 
         # Mutate and predict
         prompt = PROMPTS[member_to_mutate.expected_label]
         DigitMutator(member_to_mutate).mutate(prompt)
-        individual.reset()
+        individual.reset()  # reset distances and other fields
 
         # Update distances
         individual.members_distance = utils.get_distance(
@@ -245,15 +247,20 @@ class GeneticAlgorithm:
                 member.correctly_classified = True
             else:
                 member.correctly_classified = False
+            member.confidence_history.append(conf)  # for plotting
+            print(
+                f"exp: {member.expected_label} -> pred: {pred} (confidence: {conf:.3f})"
+            )
+
             # If confidence diff is too low and the new confidence is higher then...
             if abs(conf - member.confidence) <= 0.01 and conf >= member.confidence:
                 member.standing_steps += 1
             else:
                 member.standing_steps = 0
 
-    def evaluate_fitness(self, individuals):
+    def evaluate_fitness(self, individuals, gen=0):
         for ind in individuals:
-            ind.evaluate(self.archive.get_archive())
+            ind.evaluate(self.archive.get_archive(), gen)
             ind.fitness.values = (ind.aggregate_ff, ind.misclass)
 
     def clone_individual(self, individual):
@@ -274,11 +281,12 @@ class GeneticAlgorithm:
         new_ind.prompt = individual.prompt
         return new_ind
 
-    # TODO: See later
+    # TODO: test different strategy >> prompte prompts that are already in the archive
+    # which means less diversity but higher chance of acceptance
     def reseed_population(self, population, n_reseed):
         """
-        Sostituisce gli individui peggiori con nuovi individui
-        usando label non ancora esplorate.
+        Reseed n_reseed individuals in the population to promote diversity
+        Delete the worst individuals and replace them with new ones
         """
         if n_reseed == 0:
             return population
@@ -287,10 +295,11 @@ class GeneticAlgorithm:
         all_labels = set(range(10))
         unused_labels = all_labels - Individual.USED_LABELS
 
-        # Sostituisci gli ultimi n_reseed (i peggiori dopo selezione)
+        # Substitute the last n_reseed (worst after selection)
         for i in range(n_reseed):
             idx = len(population) - 1 - i
 
+            # Promote diversity: use unused labels first
             if len(unused_labels) > 0:
                 new_label = random.choice(list(unused_labels))
                 unused_labels.remove(new_label)
@@ -301,7 +310,7 @@ class GeneticAlgorithm:
                 population[idx] = self.create_individual(label=new_label)
                 print(f"Reseeded individual {idx} with label {new_label}")
             except ValueError:
-                print(f"Failed to reseed individual {idx}")
+                print(f"Failed to reseed individual {idx}, keeping the old one")
 
         return population
 
@@ -346,19 +355,16 @@ class GeneticAlgorithm:
             print(f"### GENERATION {gen}")
 
             # 1. Select future parents
+            # Using len(population) because it could differ from POPSIZE (in case of reseeding)
             offspring = tools.selTournamentDCD(population, len(population))
             offspring = [self.clone_individual(ind) for ind in offspring]
 
-            # 2. Reseeding (optional)
-            # See later cause I have to understand if it makes sense,
-            # and if it does, is it better to keep or delete duplicates?
-            """
+            # 2. Reseeding
             if len(self.archive.get_archive()) > 0 and gen % 10 == 0:
                 n_reseed = random.randint(
                     1, min(RESEEDUPPERBOUND, len(population) // 4)
                 )
                 population = self.reseed_population(population, n_reseed)
-            """
 
             # 3. Mutation
             print(f"Mutating {len(offspring)} offspring...")
@@ -370,7 +376,7 @@ class GeneticAlgorithm:
             # 4. Evaluation
             all_individuals = population + offspring
             self.evaluate_batch(all_individuals)
-            self.evaluate_fitness(all_individuals)
+            self.evaluate_fitness(all_individuals, gen)
             self.update_archive(all_individuals)
             print(f"Archive size: {len(self.archive.get_archive())}")
 
@@ -379,7 +385,7 @@ class GeneticAlgorithm:
             population = selNSGA2(all_individuals, len(population))
             print(f"Survived: {len(population)} individuals")
 
-            # 6. Statistiche
+            # 6. Stats
             record = stats.compile(population)
             logbook.record(gen=gen, evals=len(all_individuals), **record)
             print(f"Gen {gen}: {logbook.stream}")
@@ -413,17 +419,13 @@ class GeneticAlgorithm:
 
 if __name__ == "__main__":
     from folder import Folder
+    from utils import print_archive_experiment
 
     Folder.initialize()
 
-    # Crea e esegui GA
     ga = GeneticAlgorithm(rand_seed=7)
     population, archive = ga.run()
 
-    # Report finale
     print("\n### FINAL ARCHIVE")
-    from utils import print_archive_experiment
-
     print_archive_experiment(archive.get_archive())
-
     print("GAME OVER")
