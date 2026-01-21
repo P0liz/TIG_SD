@@ -2,6 +2,7 @@
 import numpy as np
 import utils
 from config import K, K_SD
+from individual import Individual
 
 
 def evaluate_ff1(A, B):
@@ -22,7 +23,7 @@ def evaluate_aggregate_ff(sparseness, distance):
     return result
 
 
-def dist_from_nearest_archived(ind, population, k):
+def dist_from_nearest_archived(ind: Individual, population, k):
     neighbors = list()
     for ind_pop in population:
         if ind_pop.id != ind.id:

@@ -41,9 +41,6 @@ class Individual:
 
     def reset(self):
         # do not reset id (same throughout life)
-        self.members_distance = None
-        self.members_img_euc_dist = None
-        self.members_latent_cos_sim = None
         self.sparseness = None
         self.misclass = None
         self.aggregate_ff = None
@@ -120,8 +117,6 @@ class Individual:
         )
 
     def evaluate(self, archive, step):
-        self.sparseness = None
-
         if self.misclass is None:
             # Calculate fitness function 2
             self.misclass = evaluator.evaluate_ff2(
@@ -144,11 +139,10 @@ class Individual:
             "latent_cosine": "members_latent_cos_sim",
         }[DISTANCE_METRIC]
 
-        if getattr(self, distance_attr) is None:
-            # Calculate fitness function 1
-            setattr(self, distance_attr, utils.get_distance(self.m1, self.m2))
+        # Calculate fitness function 1 (distance between members)
+        setattr(self, distance_attr, evaluator.evaluate_ff1(self.m1, self.m2))
 
-        # Recalculate sparseness at each iteration
+        # Recalculate sparseness at each iteration (to reflect changes in archive)
         self.sparseness = evaluator.evaluate_sparseness(self, archive)
         if self.sparseness == 0.0:
             print(self.sparseness)

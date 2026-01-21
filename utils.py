@@ -11,7 +11,7 @@ def get_distance(m1, m2, metric=None):
         v1 = m1.latent.flatten().unsqueeze(0)
         v2 = m2.latent.flatten().unsqueeze(0)
         cos_sim = torch.nn.functional.cosine_similarity(v1, v2)
-        return (1 - cos_sim).item()
+        return (1 - cos_sim).item()  # Convert similarity to distance
     elif metric == "image_euclidean":
         return torch.linalg.norm(m1.image_tensor - m2.image_tensor).item()
     elif metric == "latent_euclidean":

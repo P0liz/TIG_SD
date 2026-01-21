@@ -59,8 +59,7 @@ def confidence_margin(logits, exp_label):
 
     expected_prob = softmax_probs[exp_label]
     # Select the two best indices
-    best_indices = np.argsort(-softmax_probs)[:2]
-    best_index1, best_index2 = best_indices
+    best_index1, best_index2 = np.argsort(-softmax_probs)[:2]
 
     if best_index1 == exp_label:
         best_but_not_expected = best_index2

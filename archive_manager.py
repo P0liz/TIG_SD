@@ -28,7 +28,7 @@ class Archive:
 
     def __init__(self):
         self.archive = list()
-        self.archived_prompts = set()
+        self.archived_labels = set()
         self.distance_input = {
             "latent_euclidean": "members_distance",
             "image_euclidean": "members_img_euc_dist",
@@ -42,7 +42,7 @@ class Archive:
         if ind not in self.archive:
             if len(self.archive) == 0:
                 self.archive.append(ind)
-                self.archived_prompts.add(ind.prompt)
+                self.archived_labels.add(ind.m1.expected_label)
                 print("Added first member to the archive")
             else:
                 # Find the member of the archive that is closest to the candidate.
@@ -64,6 +64,12 @@ class Archive:
                     print(
                         "Candidate is close to an existing archive member, updating archive..."
                     )
+                    print(
+                        f"Old ind labels: exp->{closest_archived.m1.expected_label}, pred->{closest_archived.m1.predicted_label}, {closest_archived.m2.predicted_label}"
+                    )
+                    print(
+                        f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label}"
+                    )
                     dist_ind = getattr(ind, self.distance_input)
                     dist_archived_ind = get_distance(
                         closest_archived.m1,
@@ -72,15 +78,18 @@ class Archive:
                     if dist_ind <= dist_archived_ind:
                         self.archive.remove(closest_archived)
                         self.archive.append(ind)
-                        self.archived_prompts.add(ind.prompt)
+                        self.archived_labels.add(ind.m1.expected_label)
                 else:
                     # Add the candidate to the archive if it is distant from all the other archive members
                     print("Adding new member to the archive...")
+                    print(
+                        f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label}"
+                    )
                     self.archive.append(ind)
-                    self.archived_prompts.add(ind.prompt)
+                    self.archived_labels.add(ind.m1.expected_label)
 
     # TODO: review the entire method
-    def create_report(self, labels, generation):
+    def create_report(self, labels, generation, logbook=None):
         # Retrieve the solutions belonging to the archive.
         if generation == STEPSIZE:
             dst = join(Folder.DST, REPORT_NAME)
@@ -88,14 +97,13 @@ class Archive:
                 report_writer = csv.writer(
                     report_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
                 )
-                # TODO: rename stuff
+                # TODO: add stuff
                 report_writer.writerow(
                     [
                         "run",
                         "iteration",
                         "timestamp",
                         "archive_len",
-                        # "sparseness",
                         "total_seeds",
                         "covered_seeds",
                         "final seeds",
@@ -125,22 +133,6 @@ class Archive:
                 correct_member = ind.m1
             outer_frontier.append(misclassified_member)
             inner_frontier.append(correct_member)
-
-        """ sparsness of members ??? (not individuals?)
-        avg_sparseness = 0
-        if n > 1:
-            # Calculate sparseness of the solutions
-            sumsparseness = 0
-
-            for dig1 in outer_frontier:
-                sumdistances = 0
-                for dig2 in outer_frontier:
-                    if dig1 != dig2:
-                        sumdistances += get_distance(dig1, dig2)
-                dig1.sparseness = sumdistances / (n - 1)
-                sumsparseness += dig1.sparseness
-            avg_sparseness = sumsparseness / n
-        """
 
         out_radius = None
         in_radius = None
@@ -172,7 +164,6 @@ class Archive:
             "popsize": str(POPSIZE),
             "budget": str(budget),
             "budget_type": str(STOP_CONDITION),
-            # TODO: add exp_label?
             "archive tshd": str(ARCHIVE_THRESHOLD),
             "reseed": str(RESEEDUPPERBOUND),
             "K": str(K_SD),
@@ -198,9 +189,8 @@ class Archive:
                     str(generation),
                     str(elapsed_time),
                     str(n),
-                    # str(avg_sparseness),
                     str(len(labels)),
-                    str(len(self.archived_prompts)),
+                    str(len(self.archived_labels)),
                     str(len(final_seeds)),
                     str(stats[0]),
                     str(stats[1]),
@@ -214,6 +204,37 @@ class Archive:
                     str(in_diameter),
                 ]
             )
+        # Save logbook as CSV table
+        if logbook is not None:
+            logbook_dst = join(Folder.DST, "logbook.csv")
+            # Always write all records (overwrites each time with full history)
+            with open(logbook_dst, mode="w") as f:
+                writer = csv.writer(f)
+                writer.writerow(
+                    [
+                        "gen",
+                        "evals",
+                        "min_obj1",
+                        "min_obj2",
+                        "max_obj1",
+                        "max_obj2",
+                        "avg_obj1",
+                        "avg_obj2",
+                    ]
+                )
+                for record in logbook:
+                    writer.writerow(
+                        [
+                            record["gen"],
+                            record["evals"],
+                            record["min"][0],
+                            record["min"][1],
+                            record["max"][0],
+                            record["max"][1],
+                            record["avg"][0],
+                            record["avg"][1],
+                        ]
+                    )
 
     def get_seeds(self):
         seeds = set()

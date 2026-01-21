@@ -21,13 +21,12 @@ class MnistMember:
         clone_member.image_tensor = self.image_tensor
         clone_member.predicted_label = self.predicted_label
         clone_member.confidence = self.confidence
-        clone_member.confidence_history = list(self.confidence_history)  # deep copy
+        clone_member.confidence_history = list(self.confidence_history)
         clone_member.correctly_classified = self.correctly_classified
         return clone_member
 
     def reset(self):
         self.predicted_label = None
-        self.confidence = None
         self.correctly_classified = None
 
     def distance(self, other):

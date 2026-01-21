@@ -5,11 +5,6 @@ import torch
 from deap import base, creator, tools
 from deap.tools.emo import selNSGA2
 
-# NSGA-II fa:
-# 1. Non-dominated sorting (crea fronti di Pareto)
-# 2. Crowding distance (misura diversità)
-# 3. Seleziona: fronti migliori + individui più isolati
-
 from mnist_member import MnistMember
 from digit_mutator import DigitMutator
 from predictor import Predictor
@@ -29,8 +24,10 @@ from config import (
     HEIGHT,
     WIDTH,
     DTYPE,
+    RESEED_INTERVAL,
 )
 
+# TODO: put in config
 PROMPTS = [
     "A photo of Z0ero Number0",
     "A photo of one1 Number1",
@@ -50,9 +47,6 @@ pipe = get_pipeline()
 creator.create("FitnessMulti", base.Fitness, weights=(1.0, -1.0))
 creator.create("Individual", Individual, fitness=creator.FitnessMulti)
 
-# Global individual variables
-Individual.USED_LABELS = set()
-
 
 class GeneticAlgorithm:
 
@@ -69,7 +63,7 @@ class GeneticAlgorithm:
     # ========================================================================
 
     def generate_member(
-        self, prompt, expected_label, latent, guidance_scale=3.5, max_attempts=10
+        self, prompt, expected_label, guidance_scale=5, max_attempts=10
     ):
         """
         Generate a member with Stable Diffusion and Validate it if possible
@@ -84,6 +78,12 @@ class GeneticAlgorithm:
             member ore None if failure
         """
         for i in range(max_attempts):
+            # Generate random latent at every attempt (sometimes too much noise)
+            latent = torch.randn(
+                (1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
+                device=DEVICE,
+                dtype=DTYPE,
+            )
             # Generate member and classify it
             member = MnistMember(latent, expected_label)
             DigitMutator(member).generate(prompt, guidance_scale=guidance_scale)
@@ -93,6 +93,7 @@ class GeneticAlgorithm:
             if prediction == expected_label:
                 member.predicted_label = prediction
                 member.confidence = confidence
+                member.confidence_history.append(confidence)
                 member.correctly_classified = True
                 return member
             else:
@@ -117,24 +118,18 @@ class GeneticAlgorithm:
             label = random.randint(0, 9)
         prompt = PROMPTS[label]
 
-        latent = torch.randn(
-            (1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
-            device=DEVICE,
-            dtype=DTYPE,
-        )
-
         # Generate members
-        m1 = self.generate_member(prompt, label, latent)
+        m1 = self.generate_member(prompt, label)
         if m1 is None:
             # Riprova con guidance più alta
-            m1 = self.generate_member(prompt, label, latent, guidance_scale=5.0)
+            m1 = self.generate_member(prompt, label, guidance_scale=5.0)
             if m1 is None:
                 raise ValueError(f"Cannot create individual for label {label}")
 
         m2 = m1.clone()
 
         # Create individual
-        individual = creator.Individual(m1, m2, prompt, latent)
+        individual = creator.Individual(m1, m2, prompt, m1.latent.clone())
         Individual.USED_LABELS.add(label)
 
         return individual
@@ -165,6 +160,8 @@ class GeneticAlgorithm:
 
             except ValueError as e:
                 print(f"  ✗ Failed to create individual {i+1}: {e}")
+                # Need to fill the population anyway to avoid errors later
+                population.append(self.create_individual())  # create with random label
                 continue
 
         return population
@@ -172,11 +169,10 @@ class GeneticAlgorithm:
     # ========================================================================
     # Mutation
     # ========================================================================
-    def mutate_individual(self, individual):
+    def mutate_individual(self, individual: Individual):
         """
         Mutate a single digit chosen randomly and keep the mutation either way it goes
         Keep track of standing steps to increase mutation size if needed
-        Save confidence history and distances for plotting
         Args:
             individual (_type_): _description_
         """
@@ -184,23 +180,14 @@ class GeneticAlgorithm:
         if random.getrandbits(1):
             member_to_mutate = individual.m1
             other_member = individual.m2
-            ism1 = True
         else:
             member_to_mutate = individual.m2
             other_member = individual.m1
-            ism1 = False
-
-        """
-        if ism1:
-            individual.m1.confidence_history.append(member_to_mutate.confidence)
-        else:
-            individual.m2.confidence_history.append(member_to_mutate.confidence)
-        """
 
         # Mutate and predict
         prompt = PROMPTS[member_to_mutate.expected_label]
         DigitMutator(member_to_mutate).mutate(prompt)
-        individual.reset()  # reset distances and other fields
+        individual.reset()  # reset fitness-related fields
 
         # Update distances
         individual.members_distance = utils.get_distance(
@@ -212,21 +199,18 @@ class GeneticAlgorithm:
         individual.members_latent_cos_sim = utils.get_distance(
             member_to_mutate, other_member, "latent_cosine"
         )
-        individual.members_distances.append(individual.members_distance)
-        individual.members_img_euc_dists.append(individual.members_img_euc_dist)
-        individual.members_latent_cos_sims.append(individual.members_latent_cos_sim)
 
     # ========================================================================
     # Evaluation
     # ========================================================================
 
-    def evaluate_batch(self, individuals):
+    def evaluate_batch(self, individuals: list[Individual]):
         """
         Evaluate a batch of individuals.
         Args:
             individuals (_type_): _description_
         """
-        members_to_predict = []
+        members_to_predict: list[MnistMember] = []
 
         for ind in individuals:
             if ind.m1.predicted_label is None:
@@ -247,7 +231,6 @@ class GeneticAlgorithm:
                 member.correctly_classified = True
             else:
                 member.correctly_classified = False
-            member.confidence_history.append(conf)  # for plotting
             print(
                 f"exp: {member.expected_label} -> pred: {pred} (confidence: {conf:.3f})"
             )
@@ -258,15 +241,15 @@ class GeneticAlgorithm:
             else:
                 member.standing_steps = 0
 
-    def evaluate_fitness(self, individuals, gen=0):
+    def evaluate_fitness(self, individuals: list[Individual], gen=0):
         for ind in individuals:
             ind.evaluate(self.archive.get_archive(), gen)
             ind.fitness.values = (ind.aggregate_ff, ind.misclass)
 
-    def clone_individual(self, individual):
+    def clone_individual(self, individual: Individual):
         # Clone an individual (deep copy)
         # Use the new constructor to include the fitness field
-        new_ind = creator.Individual(
+        new_ind: Individual = creator.Individual(
             individual.m1.clone(),
             individual.m2.clone(),
             individual.prompt,
@@ -275,10 +258,11 @@ class GeneticAlgorithm:
         new_ind.members_distance = individual.members_distance
         new_ind.members_img_euc_dist = individual.members_img_euc_dist
         new_ind.members_latent_cos_sim = individual.members_latent_cos_sim
+        new_ind.prompt = individual.prompt
+        # for plotting
         new_ind.members_distances = list(individual.members_distances)
         new_ind.members_img_euc_dists = list(individual.members_img_euc_dists)
         new_ind.members_latent_cos_sims = list(individual.members_latent_cos_sims)
-        new_ind.prompt = individual.prompt
         return new_ind
 
     # TODO: test different strategy >> prompte prompts that are already in the archive
@@ -291,9 +275,9 @@ class GeneticAlgorithm:
         if n_reseed == 0:
             return population
 
-        # Trova label non usate
+        # Trova label non archiviate
         all_labels = set(range(10))
-        unused_labels = all_labels - Individual.USED_LABELS
+        unused_labels = all_labels - self.archive.archived_labels
 
         # Substitute the last n_reseed (worst after selection)
         for i in range(n_reseed):
@@ -314,11 +298,19 @@ class GeneticAlgorithm:
 
         return population
 
-    def update_archive(self, individuals):
-        print(f"{len(individuals)} new archive candidates to evaluate...")
+    def update_archive(self, individuals: list[Individual]):
         for ind in individuals:
             if ind.archive_candidate:
                 self.archive.update_archive(ind)
+
+    # Called at each gen, even if data is not modified
+    def update_data_to_plot(self, individuals: list[Individual]):
+        for ind in individuals:
+            ind.m1.confidence_history.append(ind.m1.confidence)
+            ind.m2.confidence_history.append(ind.m2.confidence)
+            ind.members_distances.append(ind.members_distance)
+            ind.members_img_euc_dists.append(ind.members_img_euc_dist)
+            ind.members_latent_cos_sims.append(ind.members_latent_cos_sim)
 
     # ========================================================================
     # Run
@@ -334,7 +326,7 @@ class GeneticAlgorithm:
         logbook.header = "gen", "evals", "min", "max", "avg"
 
         print("Generating initial population")
-        population = self.create_population(POPSIZE)
+        population: list[Individual] = self.create_population(POPSIZE)
         if len(population) < POPSIZE:
             print(f"Warning: only {len(population)}/{POPSIZE} individuals created")
 
@@ -355,12 +347,11 @@ class GeneticAlgorithm:
             print(f"### GENERATION {gen}")
 
             # 1. Select future parents
-            # Using len(population) because it could differ from POPSIZE (in case of reseeding)
-            offspring = tools.selTournamentDCD(population, len(population))
+            offspring = tools.selTournamentDCD(population, POPSIZE)
             offspring = [self.clone_individual(ind) for ind in offspring]
 
             # 2. Reseeding
-            if len(self.archive.get_archive()) > 0 and gen % 10 == 0:
+            if len(self.archive.get_archive()) > 0 and gen % RESEED_INTERVAL == 0:
                 n_reseed = random.randint(
                     1, min(RESEEDUPPERBOUND, len(population) // 4)
                 )
@@ -381,11 +372,12 @@ class GeneticAlgorithm:
             print(f"Archive size: {len(self.archive.get_archive())}")
 
             # 5. Survival selection (NSGA-II)
-            # Using len(population) because it could differ from POPSIZE (in case of reseeding)
-            population = selNSGA2(all_individuals, len(population))
+            population = selNSGA2(all_individuals, POPSIZE)
             print(f"Survived: {len(population)} individuals")
+            print(" ".join(str(ind.m1.expected_label) for ind in population))
 
             # 6. Stats
+            self.update_data_to_plot(population)  # for plotting dists and confs
             record = stats.compile(population)
             logbook.record(gen=gen, evals=len(all_individuals), **record)
             print(f"Gen {gen}: {logbook.stream}")

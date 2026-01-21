@@ -2,12 +2,13 @@
 from math import exp
 import mutation_manager
 from config import DELTA, STANDING_STEP_LIMIT
+from mnist_member import MnistMember
 
 
 class DigitMutator:
 
     def __init__(self, digit):
-        self.digit = digit
+        self.digit: MnistMember = digit
 
     def mutate(self, prompt):
         # def mutate(self, prompt, step, noise_x, noise_y): # Circular walk

@@ -1,18 +1,27 @@
 # %%writefile config.py
 import torch
-import numpy as np
 
+# Dev testing
+TRYNEW = False
+MUTATION_TYPE = "single_random"  # Or "single_conf" # Or 'dual'
 DJ_DEBUG = 1
+SHORT_GEN = True
 
 # Popolazione e generazioni
-POPSIZE = 20  # Must be divisible by 4   # std value 20
-NGEN = 100  # Number of generations     # std value 100
+if SHORT_GEN:
+    POPSIZE = 8  # Must be divisible by 4
+    NGEN = 50  # Number of generations
+    RESEED_INTERVAL = 3
+else:
+    POPSIZE = 20  # Must be divisible by 4
+    NGEN = 100  # Number of generations
+    RESEED_INTERVAL = 5
 INITIALPOP = "random"  # TODO: implement different initialization methods
 STEPSIZE = 10
-RESEEDUPPERBOUND = 3  # Reseeding moderato
+RESEEDUPPERBOUND = 5  # Max number of reseed individuals
 
 # Archive configuration
-ARCHIVE_THRESHOLD = 6  # Disabilitato per ora
+ARCHIVE_THRESHOLD = 6
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
@@ -34,8 +43,11 @@ MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 # LORA_PATH = "./SD_weights"
 LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
-DELTA = 0.04  # Old method value 0.025  # std value 0.04
 STANDING_STEP_LIMIT = 3
+if SHORT_GEN:
+    DELTA = 0.04  # affects perturbation size for mutation
+else:
+    DELTA = 0.025  # Old method value 0.025
 # Circular walk
 NOISE_SCALE = 0.025
 CIRC_STEPS = 100
@@ -53,7 +65,3 @@ else:
 # Standard image dimensions for 1.5 Stable Diffusion
 HEIGHT = 512
 WIDTH = 512
-
-# Dev testing
-TRYNEW = False
-MUTATION_TYPE = "single_random"  # Or "single_conf" # Or 'dual'
