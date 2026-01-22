@@ -25,38 +25,23 @@ from config import (
     WIDTH,
     DTYPE,
     RESEED_INTERVAL,
+    TRYNEW,
+    PROMPTS,
 )
 
-# TODO: put in config
-PROMPTS = [
-    "A photo of Z0ero Number0",
-    "A photo of one1 Number1",
-    "A photo of two2 Number2",
-    "A photo of three3 Number3",
-    "A photo of Four4 Number4",
-    "A photo of Five5 Number5",
-    "A photo of Six6 Number6",
-    "A photo of Seven7 Number7",
-    "A photo of Eight8 Number8",
-    "A photo of Nine9 Number9",
-]
 
 pipe = get_pipeline()
 
 # DEAP framework setup.
+# Maximize aggregate_ff, minimize misclass
 creator.create("FitnessMulti", base.Fitness, weights=(1.0, -1.0))
 creator.create("Individual", Individual, fitness=creator.FitnessMulti)
 
 
 class GeneticAlgorithm:
 
-    def __init__(self, rand_seed=None):
+    def __init__(self):
         self.archive = archive_manager.Archive()
-
-        # Keep deterministic outputs
-        if rand_seed is not None:
-            random.seed(rand_seed)
-            torch.manual_seed(rand_seed)
 
     # ========================================================================
     # Generation
@@ -301,7 +286,10 @@ class GeneticAlgorithm:
     def update_archive(self, individuals: list[Individual]):
         for ind in individuals:
             if ind.archive_candidate:
-                self.archive.update_archive(ind)
+                if TRYNEW:
+                    self.archive.update_size_based_archive(ind)
+                else:
+                    self.archive.update_dist_based_archive(ind)
 
     # Called at each gen, even if data is not modified
     def update_data_to_plot(self, individuals: list[Individual]):
@@ -384,7 +372,7 @@ class GeneticAlgorithm:
 
             # 7. Debug report
             if DJ_DEBUG and gen % STEPSIZE == 0:
-                self.archive.create_report(Individual.USED_LABELS, gen)
+                self.archive.create_report(Individual.USED_LABELS, gen, logbook)
 
             gen += 1
 
@@ -394,7 +382,7 @@ class GeneticAlgorithm:
                 break
 
         # Ending process
-        self.archive.create_report(Individual.USED_LABELS, "final")
+        self.archive.create_report(Individual.USED_LABELS, "final", logbook)
 
         print(f"Final statistics:")
         print(f"Individuals created: {Individual.COUNT}")
@@ -413,11 +401,13 @@ if __name__ == "__main__":
     from folder import Folder
     from utils import print_archive_experiment
 
-    Folder.initialize()
+    for i in range(2):
+        Folder.initialize()
 
-    ga = GeneticAlgorithm(rand_seed=7)
-    population, archive = ga.run()
+        ga = GeneticAlgorithm()
+        population, archive = ga.run()
 
-    print("\n### FINAL ARCHIVE")
-    print_archive_experiment(archive.get_archive())
-    print("GAME OVER")
+        print("\n### FINAL ARCHIVE")
+        print_archive_experiment(archive.get_archive())
+        print("GAME OVER")
+        TRYNEW = not TRYNEW

@@ -25,6 +25,10 @@ ARCHIVE_THRESHOLD = 6
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
+if SHORT_GEN:
+    TARGET_SIZE = 6
+else:
+    TARGET_SIZE = 15  # Target size for size-based archive
 
 # Timer
 RUNTIME = 3600
@@ -65,3 +69,16 @@ else:
 # Standard image dimensions for 1.5 Stable Diffusion
 HEIGHT = 512
 WIDTH = 512
+
+PROMPTS = [
+    "A photo of Z0ero Number0",
+    "A photo of one1 Number1",
+    "A photo of two2 Number2",
+    "A photo of three3 Number3",
+    "A photo of Four4 Number4",
+    "A photo of Five5 Number5",
+    "A photo of Six6 Number6",
+    "A photo of Seven7 Number7",
+    "A photo of Eight8 Number8",
+    "A photo of Nine9 Number9",
+]

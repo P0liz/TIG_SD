@@ -63,6 +63,15 @@ def evaluate_sparseness(ind, individuals):
 # This is different from the generic distance method in individual.py
 # It considers the correctly classified and misclassified members separately
 def eval_archive_dist(ind1, ind2):
+    """
+    Determines the distance between two individuals for archive management
+    Args:
+        ind1 (_type_): _description_
+        ind2 (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     if ind1.m1.predicted_label == ind1.m1.expected_label:
         ind1_correct = ind1.m1
         ind1_misclass = ind1.m2

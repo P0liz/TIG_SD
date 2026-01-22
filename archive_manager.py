@@ -6,8 +6,9 @@ from os.path import join
 from folder import Folder
 from timer import Timer
 from utils import get_distance, get_diameter, get_radius_reference
-from evaluator import eval_archive_dist
+from evaluator import eval_archive_dist, evaluate_sparseness
 import numpy as np
+from individual import Individual
 
 from config import (
     ARCHIVE_THRESHOLD,
@@ -21,6 +22,7 @@ from config import (
     REPORT_NAME,
     STEPSIZE,
     DISTANCE_METRIC,
+    TARGET_SIZE,
 )
 
 
@@ -29,6 +31,7 @@ class Archive:
     def __init__(self):
         self.archive = list()
         self.archived_labels = set()
+        self.target_size = TARGET_SIZE
         self.distance_input = {
             "latent_euclidean": "members_distance",
             "image_euclidean": "members_img_euc_dist",
@@ -38,7 +41,78 @@ class Archive:
     def get_archive(self):
         return self.archive
 
-    def update_archive(self, ind):
+    def update_size_based_archive(self, ind: Individual):
+        if ind not in self.archive:
+            # archive is empty
+            if len(self.archive) == 0:
+                print(
+                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                )
+                self.archive.append(ind)
+                self.archived_labels.add(ind.m1.expected_label)
+            else:
+                # Find the member of the archive that is closest to the candidate.
+                d_min = evaluate_sparseness(ind, self.archive)
+                # archive is not full
+                if len(self.archive) / self.target_size < 1:
+                    # not the same sparseness
+                    if d_min > 0:
+                        print(
+                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                        )
+                        self.archive.append(ind)
+                        self.archived_labels.add(ind.m1.expected_label)
+
+                # archive is full
+                else:
+                    # find the individual with the most distant members and smallest sparseness
+                    c: Individual = sorted(
+                        self.archive,
+                        key=lambda x: (getattr(x, self.distance_input), -x.sparseness),
+                        reverse=True,
+                    )[0]
+                    # replace c if ind has closer members
+                    if getattr(c, self.distance_input) > getattr(
+                        ind, self.distance_input
+                    ):
+                        print(
+                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                        )
+                        print(
+                            f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}, sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
+                        )
+                        self.archive.remove(c)
+                        self.archive.append(ind)
+                        self.archived_labels.add(ind.m1.expected_label)
+                    elif getattr(c, self.distance_input) == getattr(
+                        ind, self.distance_input
+                    ):
+                        # ind has better performance
+                        if ind.misclass < c.misclass:
+                            print(
+                                f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                            )
+                            print(
+                                f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}, sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
+                            )
+                            self.archive.remove(c)
+                            self.archive.append(ind)
+                            self.archived_labels.add(ind.m1.expected_label)
+                        # c and ind have the same performance
+                        elif ind.misclass == c.misclass:
+                            # ind has better sparseness
+                            if d_min > c.sparseness:
+                                print(
+                                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                                )
+                                print(
+                                    f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}, sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
+                                )
+                                self.archive.remove(c)
+                                self.archive.append(ind)
+                                self.archived_labels.add(ind.m1.expected_label)
+
+    def update_dist_based_archive(self, ind: Individual):
         if ind not in self.archive:
             if len(self.archive) == 0:
                 self.archive.append(ind)
@@ -49,6 +123,7 @@ class Archive:
                 closest_archived = None
                 d_min = np.inf
                 i = 0
+                # TODO: why not just use sparseness evaluation here?
                 while i < len(self.archive):
                     distance_archived = eval_archive_dist(ind, self.archive[i])
                     if distance_archived < d_min:

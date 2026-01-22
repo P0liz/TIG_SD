@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 from mnist_classifier.model_mnist import MnistClassifier
-from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH
+from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH, TRYNEW
 
 
 class Predictor:
@@ -28,7 +28,10 @@ class Predictor:
         # confidence, label = simple_confidence_margin(logits)
 
         # margin between expected and top logits
-        confidence, label = confidence_margin(logits, exp_label)
+        if TRYNEW:
+            confidence, label = normalized_confidence_margin(logits, exp_label)
+        else:
+            confidence, label = confidence_margin(logits, exp_label)
 
         return label, confidence
 
@@ -43,6 +46,9 @@ class Predictor:
         predictions = []
         confidences = []
         for logits, exp_label in zip(batch_logits, exp_labels):
+            # if TRYNEW:
+            # confidence, label = normalized_confidence_margin(logits, exp_label)
+            # else:
             confidence, label = confidence_margin(logits, exp_label)
             predictions.append(label)
             confidences.append(confidence)
@@ -50,7 +56,7 @@ class Predictor:
         return predictions, confidences
 
 
-def confidence_margin(logits, exp_label):
+def normalized_confidence_margin(logits, exp_label):
     # Convert numpy array to torch tensor
     logits_tensor = torch.from_numpy(logits).float()
     # Apply softmax to normalize (since I do not want row logits)
@@ -68,6 +74,26 @@ def confidence_margin(logits, exp_label):
     best_prob = softmax_probs[best_but_not_expected]
     # Calculate margin between expected and top normalized logits
     margin = expected_prob - best_prob
+    new_label = np.argmax(logits)
+    return margin, new_label
+
+
+def confidence_margin(logits, exp_label):
+    # Convert numpy array to torch tensor
+    logits_tensor = torch.from_numpy(logits).float()
+    # print(f"logits_tensor: {logits_tensor}")
+
+    expected_logit = logits_tensor[exp_label]
+    # Select the two best indices
+    best_index1, best_index2 = np.argsort(-logits_tensor)[:2]
+
+    if best_index1 == exp_label:
+        best_but_not_expected = best_index2
+    else:
+        best_but_not_expected = best_index1
+    best_logit = logits_tensor[best_but_not_expected]
+    # Calculate margin between expected and top normalized logits
+    margin = expected_logit - best_logit
     new_label = np.argmax(logits)
     return margin, new_label
 
