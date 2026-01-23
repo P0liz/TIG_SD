@@ -28,10 +28,10 @@ class Predictor:
         # confidence, label = simple_confidence_margin(logits)
 
         # margin between expected and top logits
-        if TRYNEW:
-            confidence, label = normalized_confidence_margin(logits, exp_label)
-        else:
-            confidence, label = confidence_margin(logits, exp_label)
+        # if TRYNEW:
+        confidence, label = normalized_confidence_margin(logits, exp_label)
+        # else:
+        # confidence, label = confidence_margin(logits, exp_label)
 
         return label, confidence
 
@@ -47,9 +47,9 @@ class Predictor:
         confidences = []
         for logits, exp_label in zip(batch_logits, exp_labels):
             # if TRYNEW:
-            # confidence, label = normalized_confidence_margin(logits, exp_label)
+            confidence, label = normalized_confidence_margin(logits, exp_label)
             # else:
-            confidence, label = confidence_margin(logits, exp_label)
+            # confidence, label = confidence_margin(logits, exp_label)
             predictions.append(label)
             confidences.append(confidence)
 

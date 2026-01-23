@@ -37,7 +37,6 @@ RUNTIME = 3600
 K_SD = 0.1
 K = 1
 
-
 # Classifier
 CLASSIFIER_WEIGHTS_PATH = "./mnist_classifier/weight/MNIST_conv_classifier.pth"
 IMG_SIZE = 28
@@ -47,9 +46,9 @@ MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 # LORA_PATH = "./SD_weights"
 LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
-STANDING_STEP_LIMIT = 3
+STANDING_STEP_LIMIT = 2
 if SHORT_GEN:
-    DELTA = 0.04  # affects perturbation size for mutation
+    DELTA = 0.045  # affects perturbation size for mutation
 else:
     DELTA = 0.025  # Old method value 0.025
 # Circular walk

@@ -46,7 +46,7 @@ class Archive:
             # archive is empty
             if len(self.archive) == 0:
                 print(
-                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
                 )
                 self.archive.append(ind)
                 self.archived_labels.add(ind.m1.expected_label)
@@ -58,7 +58,7 @@ class Archive:
                     # not the same sparseness
                     if d_min > 0:
                         print(
-                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
                         )
                         self.archive.append(ind)
                         self.archived_labels.add(ind.m1.expected_label)
@@ -76,10 +76,10 @@ class Archive:
                         ind, self.distance_input
                     ):
                         print(
-                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
                         )
                         print(
-                            f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}, sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
+                            f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}), sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
                         )
                         self.archive.remove(c)
                         self.archive.append(ind)
@@ -90,10 +90,10 @@ class Archive:
                         # ind has better performance
                         if ind.misclass < c.misclass:
                             print(
-                                f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                                f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
                             )
                             print(
-                                f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}, sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
+                                f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}), sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
                             )
                             self.archive.remove(c)
                             self.archive.append(ind)
@@ -103,10 +103,10 @@ class Archive:
                             # ind has better sparseness
                             if d_min > c.sparseness:
                                 print(
-                                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}, sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
                                 )
                                 print(
-                                    f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}, sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
+                                    f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}), sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
                                 )
                                 self.archive.remove(c)
                                 self.archive.append(ind)
@@ -282,34 +282,43 @@ class Archive:
         # Save logbook as CSV table
         if logbook is not None:
             logbook_dst = join(Folder.DST, "logbook.csv")
-            # Always write all records (overwrites each time with full history)
-            with open(logbook_dst, mode="w") as f:
+            mode = "w" if generation == 0 else "a"
+
+            with open(logbook_dst, mode=mode) as f:
                 writer = csv.writer(f)
-                writer.writerow(
-                    [
-                        "gen",
-                        "evals",
-                        "min_obj1",
-                        "min_obj2",
-                        "max_obj1",
-                        "max_obj2",
-                        "avg_obj1",
-                        "avg_obj2",
-                    ]
-                )
-                for record in logbook:
+
+                if generation == 0:
                     writer.writerow(
                         [
-                            record["gen"],
-                            record["evals"],
-                            record["min"][0],
-                            record["min"][1],
-                            record["max"][0],
-                            record["max"][1],
-                            record["avg"][0],
-                            record["avg"][1],
+                            "gen",
+                            "pop_evals",
+                            "pop_archived",
+                            "covered_labels",
+                            "min_obj1",
+                            "min_obj2",
+                            "max_obj1",
+                            "max_obj2",
+                            "avg_obj1",
+                            "avg_obj2",
                         ]
                     )
+
+                # Write only the last record (current generation)
+                record = logbook[-1]
+                writer.writerow(
+                    [
+                        record["gen"],
+                        record["evals"],
+                        str(len(self.archive)),
+                        ", ".join(str(ind.m1.expected_label) for ind in self.archive),
+                        record["min"][0],
+                        record["min"][1],
+                        record["max"][0],
+                        record["max"][1],
+                        record["avg"][0],
+                        record["avg"][1],
+                    ]
+                )
 
     def get_seeds(self):
         seeds = set()
