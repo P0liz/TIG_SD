@@ -6,7 +6,8 @@ from os.path import join
 from folder import Folder
 from timer import Timer
 from utils import get_distance, get_diameter, get_radius_reference
-from evaluator import eval_archive_dist, evaluate_sparseness
+from evaluator import eval_archive_dist, evaluate_sparseness, dist_from_nearest_archived
+from data_visualization import plot_labels
 import numpy as np
 from individual import Individual
 
@@ -23,6 +24,7 @@ from config import (
     STEPSIZE,
     DISTANCE_METRIC,
     TARGET_SIZE,
+    K,
 )
 
 
@@ -52,7 +54,8 @@ class Archive:
                 self.archived_labels.add(ind.m1.expected_label)
             else:
                 # Find the member of the archive that is closest to the candidate.
-                d_min = evaluate_sparseness(ind, self.archive)
+                # d_min = evaluate_sparseness(ind, self.archive)    # previous
+                d_min, c = dist_from_nearest_archived(ind, self.archive, K)
                 # archive is not full
                 if len(self.archive) / self.target_size < 1:
                     # not the same sparseness
@@ -65,12 +68,15 @@ class Archive:
 
                 # archive is full
                 else:
+                    # TODO: to prioritize diversity would be better to use as PK +sparseness
+                    """# previous
                     # find the individual with the most distant members and smallest sparseness
                     c: Individual = sorted(
                         self.archive,
                         key=lambda x: (getattr(x, self.distance_input), -x.sparseness),
                         reverse=True,
                     )[0]
+                    """
                     # replace c if ind has closer members
                     if getattr(c, self.distance_input) > getattr(
                         ind, self.distance_input
@@ -164,7 +170,7 @@ class Archive:
                     self.archived_labels.add(ind.m1.expected_label)
 
     # TODO: review the entire method
-    def create_report(self, labels, generation, logbook=None):
+    def create_report(self, labels, generation, logbook=None, labels_history=None):
         # Retrieve the solutions belonging to the archive.
         if generation == STEPSIZE:
             dst = join(Folder.DST, REPORT_NAME)
@@ -319,6 +325,9 @@ class Archive:
                         record["avg"][1],
                     ]
                 )
+        if labels_history is not None:
+            dst = join(Folder.DST, "labels_history.png")
+            plot_labels(labels_history, dst)
 
     def get_seeds(self):
         seeds = set()

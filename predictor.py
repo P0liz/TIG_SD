@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 from mnist_classifier.model_mnist import MnistClassifier
-from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH, TRYNEW
+from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH
 
 
 class Predictor:
@@ -25,13 +25,11 @@ class Predictor:
             logits = Predictor.classifier(member.image_tensor).squeeze().cpu().numpy()
 
         # Margin between the 2 top logits as confidence score
-        # confidence, label = simple_confidence_margin(logits)
+        # label, confidence = simple_confidence_margin(logits)
 
         # margin between expected and top logits
-        # if TRYNEW:
-        confidence, label = normalized_confidence_margin(logits, exp_label)
-        # else:
-        # confidence, label = confidence_margin(logits, exp_label)
+        label, confidence = normalized_confidence_margin(logits, exp_label)
+        # label, confidence = comparison_confidence_helper(logits, exp_label)
 
         return label, confidence
 
@@ -46,14 +44,23 @@ class Predictor:
         predictions = []
         confidences = []
         for logits, exp_label in zip(batch_logits, exp_labels):
-            # if TRYNEW:
-            confidence, label = normalized_confidence_margin(logits, exp_label)
-            # else:
-            # confidence, label = confidence_margin(logits, exp_label)
+            label, confidence = normalized_confidence_margin(logits, exp_label)
+            # label, confidence = comparison_confidence_helper(logits, exp_label)
             predictions.append(label)
             confidences.append(confidence)
 
         return predictions, confidences
+
+
+def comparison_confidence_helper(logits, exp_label):
+    import config
+
+    if config.TRYNEW:
+        label, confidence = normalized_confidence_margin(logits, exp_label)
+    else:
+        label, confidence = confidence_margin(logits, exp_label)
+
+    return label, confidence
 
 
 def normalized_confidence_margin(logits, exp_label):
@@ -75,7 +82,7 @@ def normalized_confidence_margin(logits, exp_label):
     # Calculate margin between expected and top normalized logits
     margin = expected_prob - best_prob
     new_label = np.argmax(logits)
-    return margin, new_label
+    return new_label, margin
 
 
 def confidence_margin(logits, exp_label):
@@ -95,7 +102,7 @@ def confidence_margin(logits, exp_label):
     # Calculate margin between expected and top normalized logits
     margin = expected_logit - best_logit
     new_label = np.argmax(logits)
-    return margin, new_label
+    return new_label, margin
 
 
 def simple_confidence_margin(logits):
@@ -105,4 +112,4 @@ def simple_confidence_margin(logits):
     # Get margin between top 2 normalized logits
     sorted_probs = np.sort(softmax_probs)[::-1]
     new_label = np.argmax(logits)
-    return sorted_probs[0] - sorted_probs[1], new_label
+    return new_label, sorted_probs[0] - sorted_probs[1]

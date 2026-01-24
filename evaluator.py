@@ -29,22 +29,23 @@ def dist_from_nearest_archived(ind: Individual, population, k):
         if ind_pop.id != ind.id:
             d = ind.distance(ind_pop)
             if d > 0.0:
-                neighbors.append(d)
+                neighbors.append((d, ind_pop))
 
     if len(neighbors) == 0:
         assert len(population) > 0
-        assert population[0].id == ind.id
-        return -1.0
+        # assert (population[0].id == ind.id)
+        return -1.0, ind
 
-    neighbors.sort()
+    neighbors = sorted(neighbors, key=lambda x: x[0])
     nns = neighbors[:k]
+    # k > 1 is not handeled yet
     if k > 1:
         dist = np.mean(nns)
     elif k == 1:
-        dist = nns[0]
+        dist = nns[0][0]
     if dist == 0.0:
-        print(ind)
-    return dist
+        print("bug")
+    return dist, nns[0][1]
 
 
 def evaluate_sparseness(ind, individuals):
@@ -54,7 +55,7 @@ def evaluate_sparseness(ind, individuals):
     if (N == 0) or (N == 1 and individuals[0] == ind):
         sparseness = 1
     else:
-        sparseness = dist_from_nearest_archived(ind, individuals, K)
+        sparseness, _ = dist_from_nearest_archived(ind, individuals, K)
 
     return sparseness
 

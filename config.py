@@ -2,9 +2,9 @@
 import torch
 
 # Dev testing
-TRYNEW = False
+TRYNEW = True
 MUTATION_TYPE = "single_random"  # Or "single_conf" # Or 'dual'
-DJ_DEBUG = 1
+DJ_DEBUG = True  # If True, creates detailed debug reports
 SHORT_GEN = True
 
 # Popolazione e generazioni
@@ -21,14 +21,12 @@ STEPSIZE = 10
 RESEEDUPPERBOUND = 5  # Max number of reseed individuals
 
 # Archive configuration
-ARCHIVE_THRESHOLD = 6
+# Maximum distance between two individuals to be considered different enough
+ARCHIVE_THRESHOLD = 10
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
-if SHORT_GEN:
-    TARGET_SIZE = 6
-else:
-    TARGET_SIZE = 15  # Target size for size-based archive
+TARGET_SIZE = (3 * POPSIZE) // 4  # Ideal number of archived individuals
 
 # Timer
 RUNTIME = 3600

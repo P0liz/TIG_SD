@@ -25,8 +25,8 @@ from config import (
     WIDTH,
     DTYPE,
     RESEED_INTERVAL,
-    TRYNEW,
     PROMPTS,
+    SHORT_GEN,
 )
 
 
@@ -134,7 +134,10 @@ class GeneticAlgorithm:
         for i in range(size):
             try:
                 # Use different labels
-                label = i % 10
+                if SHORT_GEN:
+                    label = random.randint(0, len(PROMPTS) - 1)
+                else:
+                    label = i % len(PROMPTS)
                 ind = self.create_individual(label=label)
                 population.append(ind)
 
@@ -286,10 +289,13 @@ class GeneticAlgorithm:
     def update_archive(self, individuals: list[Individual]):
         for ind in individuals:
             if ind.archive_candidate:
-                if TRYNEW:
+                import config  # comparison pourpose
+
+                if config.TRYNEW:
                     self.archive.update_size_based_archive(ind)
                 else:
                     self.archive.update_dist_based_archive(ind)
+                # self.archive.update_dist_based_archive(ind)
 
     # Called at each gen, even if data is not modified
     def update_data_to_plot(self, individuals: list[Individual]):
@@ -328,6 +334,13 @@ class GeneticAlgorithm:
         record = stats.compile(population)
         logbook.record(gen=0, evals=len(population), **record)
         print(f"Gen 0: {logbook.stream}")
+        # to plot label distribution
+        labels_history = {0: [ind.m1.expected_label for ind in population]}
+
+        if DJ_DEBUG:
+            self.archive.create_report(
+                Individual.USED_LABELS, generation=0, logbook=logbook
+            )
 
         # Begin the generational process
         gen = 1
@@ -369,6 +382,8 @@ class GeneticAlgorithm:
             record = stats.compile(population)
             logbook.record(gen=gen, evals=len(all_individuals), **record)
             print(f"Gen {gen}: {logbook.stream}")
+            # to plot label distribution
+            labels_history[gen] = [ind.m1.expected_label for ind in population]
 
             # 7. Debug report
             if DJ_DEBUG and gen % STEPSIZE == 0:
@@ -382,7 +397,9 @@ class GeneticAlgorithm:
                 break
 
         # Ending process
-        self.archive.create_report(Individual.USED_LABELS, "final", logbook)
+        self.archive.create_report(
+            Individual.USED_LABELS, "final", logbook, labels_history
+        )
 
         print(f"Final statistics:")
         print(f"Individuals created: {Individual.COUNT}")
@@ -400,6 +417,7 @@ class GeneticAlgorithm:
 if __name__ == "__main__":
     from folder import Folder
     from utils import print_archive_experiment
+    import config
 
     for i in range(2):
         Folder.initialize()
@@ -410,4 +428,4 @@ if __name__ == "__main__":
         print("\n### FINAL ARCHIVE")
         print_archive_experiment(archive.get_archive())
         print("GAME OVER")
-        TRYNEW = not TRYNEW
+        config.TRYNEW = not config.TRYNEW  # toggle method for next run

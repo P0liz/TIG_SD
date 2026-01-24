@@ -1,5 +1,7 @@
+# %%writefile data_visualization.py
 from PIL import Image
 import matplotlib.pyplot as plt
+from config import PROMPTS
 
 
 def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
@@ -31,6 +33,37 @@ def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
     )
 
 
+def plot_labels(label_history, save_path):
+    """
+    Plot label distribution over generations.
+
+    Args:
+        label_history (dict): {generation: [labels]} mapping
+        save_path (str): Path to save the plot.
+    """
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    generations = sorted(label_history.keys())
+    counts = {i: [] for i in range(len(PROMPTS))}
+
+    for gen in generations:
+        labels = label_history[gen]
+        for digit in range(len(PROMPTS)):
+            counts[digit].append(labels.count(digit))
+
+    for digit in range(len(PROMPTS)):
+        ax.plot(generations, counts[digit], label=f"Digit {digit}", marker="o")
+
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Count")
+    ax.legend(loc="best")
+    ax.grid(True, alpha=0.3)
+    plt.title("Label Distribution Over Generations")
+    plt.savefig(save_path)
+    plt.close(fig)
+    print(f"Plot saved to {save_path}")
+
+
 def plot_confidence(confidences, save_path):
     """
     Plot confidence scores and save the plot to a given path.
@@ -48,14 +81,10 @@ def plot_confidence(confidences, save_path):
     ax.set_ylabel("Confidence Score")
     ax.tick_params("y")
 
-    # Set title
-    plt.title("Confidence Scores")
-
     # Save plot
+    plt.title("Confidence Scores")
     plt.savefig(save_path)
     plt.close(fig)
-
-    # Print message
     print(f"Plot saved to {save_path}")
 
 
@@ -75,12 +104,8 @@ def plot_distance(distances, save_path, title):
     ax.set_ylabel("Distance")
     ax.tick_params("y")
 
-    # Set title
-    plt.title(title)
-
     # Save plot
+    plt.title(title)
     plt.savefig(save_path)
     plt.close(fig)
-
-    # Print message
     print(f"Plot saved to {save_path}")
