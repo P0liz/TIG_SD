@@ -45,7 +45,7 @@ class Archive:
     def get_archive(self):
         return self.archive
 
-    def update_size_based_archive(self, ind: Individual):
+    def update_size_based_archive(self, ind: "Individual"):
         if ind not in self.archive:
             # archive is empty
             if len(self.archive) == 0:
@@ -111,7 +111,7 @@ class Archive:
                                 self.archive.append(ind)
                                 self.archived_labels.add(ind.m1.expected_label)
 
-    def update_dist_based_archive(self, ind: Individual):
+    def update_dist_based_archive(self, ind: "Individual"):
         if ind not in self.archive:
             if len(self.archive) == 0:
                 self.archive.append(ind)

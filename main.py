@@ -289,12 +289,28 @@ class GeneticAlgorithm:
 
             try:
                 population[idx] = self.create_individual(label=new_label)
-                print(f"Reseeded individual {idx} with label {new_label}")
+                print("Reseeded individual")
             except ValueError:
-                print(f"Failed to reseed individual {idx}, keeping the old one")
+                print(
+                    f"Failed to reseed individual {population[idx].id}, keeping the old one"
+                )
 
-        # TODO: cut all individuals of a certain label
-        # if that label is over 50% of population? (maybe after a while)
+        # Population cut
+        # if a label is over 50% of population remove all those individuals
+        count = []
+        for pop in population:
+            idx = pop.m1.expected_label
+            count[idx] += 1
+            if count[idx] > len(population) / 2:
+                # remove all individuals with that label
+                population = [ind for ind in population if ind.m1.expected_label != idx]
+                # add new ones
+                try:
+                    for i in POPSIZE - len(population):
+                        new_ind = self.create_individual()
+                        population.append(new_ind)
+                except ValueError:
+                    print(f"Failed to create new individual after population cut")
 
         return population
 
@@ -363,8 +379,7 @@ class GeneticAlgorithm:
             offspring = [self.clone_individual(ind) for ind in offspring]
 
             # 2. Reseeding
-            # Use gen % RESEED_INTERVAL == 0 to have less aggressive reseeding
-            if len(self.archive.get_archive()) > 0:
+            if len(self.archive.get_archive()) > 0 and gen % RESEED_INTERVAL == 0:
                 n_reseed = random.randint(1, RESEEDUPPERBOUND)
                 population = self.reseed_population(population, n_reseed)
 

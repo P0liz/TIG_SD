@@ -16,7 +16,7 @@ else:
     POPSIZE = 20  # Must be divisible by 4
     NGEN = 100  # Number of generations
     RESEED_INTERVAL = 5
-INITIALPOP = "random"  # Or "sequence"
+INITIALPOP = "sequence"  # Or random"
 STEPSIZE = 10
 RESEEDUPPERBOUND = POPSIZE // 4  # Max number of reseed individuals
 

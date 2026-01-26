@@ -26,7 +26,7 @@ def evaluate_aggregate_ff(sparseness, distance):
     return result
 
 
-def dist_from_nearest_archived(ind: Individual, population, k):
+def dist_from_nearest_archived(ind: "Individual", population: list["Individual"], k):
     neighbors = list()
     for ind_pop in population:
         if ind_pop.id != ind.id:
@@ -51,7 +51,7 @@ def dist_from_nearest_archived(ind: Individual, population, k):
     return dist, nns[0][1]
 
 
-def evaluate_sparseness(ind: Individual, individuals: list[Individual]):
+def evaluate_sparseness(ind: "Individual", individuals: list["Individual"]):
     N = len(individuals)
     # Sparseness is evaluated only if the archive is not empty
     # Otherwise the sparseness is 1

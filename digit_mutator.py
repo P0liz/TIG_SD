@@ -25,6 +25,7 @@ class DigitMutator:
             base_delta = DELTA * (self.digit.standing_steps / STANDING_STEP_LIMIT + 1)
         # perturbation_size = base_delta * exp(self.digit.confidence)   # Old method
         perturbation_size = base_delta  # understand if this should change
+        print(f"Perturbation size: {perturbation_size:.3f}")
 
         # Mutazione nel latent space
         mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size)

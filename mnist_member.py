@@ -23,6 +23,7 @@ class MnistMember:
         clone_member.confidence = self.confidence
         clone_member.confidence_history = list(self.confidence_history)
         clone_member.correctly_classified = self.correctly_classified
+        clone_member.standing_steps = self.standing_steps
         return clone_member
 
     def reset(self):
