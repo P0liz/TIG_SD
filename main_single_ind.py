@@ -1,4 +1,4 @@
-# %%writer main_single_ind.py
+# %%writefile main_single_ind.py
 import torch
 import random
 import re

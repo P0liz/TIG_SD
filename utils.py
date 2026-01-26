@@ -1,4 +1,4 @@
-# %%writer utils.py
+# %%writefile utils.py
 import numpy as np
 import torch
 from config import DISTANCE_METRIC

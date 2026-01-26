@@ -1,8 +1,11 @@
-# %%writer evaluator.py
+# %%writefile evaluator.py
 import numpy as np
 import utils
 from config import K, K_SD
-from individual import Individual
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from individual import Individual
 
 
 def evaluate_ff1(A, B):
@@ -48,7 +51,7 @@ def dist_from_nearest_archived(ind: Individual, population, k):
     return dist, nns[0][1]
 
 
-def evaluate_sparseness(self, ind, individuals):
+def evaluate_sparseness(ind: Individual, individuals: list[Individual]):
     N = len(individuals)
     # Sparseness is evaluated only if the archive is not empty
     # Otherwise the sparseness is 1
@@ -56,11 +59,11 @@ def evaluate_sparseness(self, ind, individuals):
         ind.sparseness = np.inf
         closest = ind
     elif N == 2:
-        ind.sparseness, closest = self.dist_from_nearest_archived(ind, individuals, K)
+        ind.sparseness, closest = dist_from_nearest_archived(ind, individuals, K)
         individuals[0].sparseness = ind.sparseness
         individuals[1].sparseness = ind.sparseness
     else:
-        ind.sparseness, closest = self.dist_from_nearest_archived(ind, individuals, K)
+        ind.sparseness, closest = dist_from_nearest_archived(ind, individuals, K)
     return ind.sparseness, closest
 
 

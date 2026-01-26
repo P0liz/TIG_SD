@@ -9,7 +9,10 @@ from utils import get_distance, get_diameter, get_radius_reference
 from evaluator import eval_archive_dist, evaluate_sparseness
 from data_visualization import plot_labels
 import numpy as np
-from individual import Individual
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from individual import Individual
 
 from config import (
     ARCHIVE_THRESHOLD,

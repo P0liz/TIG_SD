@@ -1,4 +1,4 @@
-# %%writer mutation_manager.py
+# %%writefile mutation_manager.py
 from PIL import Image
 import numpy as np
 import cv2

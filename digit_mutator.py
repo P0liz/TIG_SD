@@ -1,4 +1,4 @@
-# %%writer digit_mutator.py
+# %%writefile digit_mutator.py
 from math import exp
 import mutation_manager
 from config import DELTA, STANDING_STEP_LIMIT

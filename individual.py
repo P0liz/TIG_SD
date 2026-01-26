@@ -11,7 +11,6 @@ import evaluator
 from folder import Folder
 from data_visualization import plot_confidence, plot_distance
 from config import DISTANCE_METRIC
-import utils
 
 
 class Individual:
