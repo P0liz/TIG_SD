@@ -26,7 +26,9 @@ from config import (
     DTYPE,
     RESEED_INTERVAL,
     PROMPTS,
-    SHORT_GEN,
+    INITIALPOP,
+    ARCHIVE_TYPE,
+    CONF_CHANGE,
 )
 
 
@@ -48,7 +50,7 @@ class GeneticAlgorithm:
     # ========================================================================
 
     def generate_member(
-        self, prompt, expected_label, guidance_scale=5, max_attempts=10
+        self, prompt, expected_label, guidance_scale=3.5, max_attempts=10
     ):
         """
         Generate a member with Stable Diffusion and Validate it if possible
@@ -134,10 +136,12 @@ class GeneticAlgorithm:
         for i in range(size):
             try:
                 # Use different labels
-                if SHORT_GEN:
+                if INITIALPOP == "random":
                     label = random.randint(0, len(PROMPTS) - 1)
-                else:
+                elif INITIALPOP == "sequence":
                     label = i % len(PROMPTS)
+                else:
+                    break
                 ind = self.create_individual(label=label)
                 population.append(ind)
 
@@ -147,11 +151,13 @@ class GeneticAlgorithm:
                 )
 
             except ValueError as e:
-                print(f"  ✗ Failed to create individual {i+1}: {e}")
+                print(f"Failed to create individual {i+1}: {e}")
                 # Need to fill the population anyway to avoid errors later
                 population.append(self.create_individual())  # create with random label
                 continue
 
+        if len(population) != POPSIZE:
+            raise ValueError(f"Invalid INITIALPOP value: {INITIALPOP}")
         return population
 
     # ========================================================================
@@ -224,7 +230,10 @@ class GeneticAlgorithm:
             )
 
             # If confidence diff is too low and the new confidence is higher then...
-            if abs(conf - member.confidence) <= 0.01 and conf >= member.confidence:
+            if (
+                abs(conf - member.confidence) <= CONF_CHANGE
+                and conf >= member.confidence
+            ):
                 member.standing_steps += 1
             else:
                 member.standing_steps = 0
@@ -253,7 +262,7 @@ class GeneticAlgorithm:
         new_ind.members_latent_cos_sims = list(individual.members_latent_cos_sims)
         return new_ind
 
-    # TODO: test different strategy >> prompte prompts that are already in the archive
+    # TODO: test different strategy >> prompte prompts and latents that are already in the archive
     # which means less diversity but higher chance of acceptance
     def reseed_population(self, population, n_reseed):
         """
@@ -263,7 +272,7 @@ class GeneticAlgorithm:
         if n_reseed == 0:
             return population
 
-        # Trova label non archiviate
+        # Find labels which are not in the archive
         all_labels = set(range(10))
         unused_labels = all_labels - self.archive.archived_labels
 
@@ -284,18 +293,20 @@ class GeneticAlgorithm:
             except ValueError:
                 print(f"Failed to reseed individual {idx}, keeping the old one")
 
+        # TODO: cut all individuals of a certain label
+        # if that label is over 50% of population? (maybe after a while)
+
         return population
 
     def update_archive(self, individuals: list[Individual]):
         for ind in individuals:
             if ind.archive_candidate:
-                import config  # comparison pourpose
-
-                if config.TRYNEW:
+                if ARCHIVE_TYPE == "size":
                     self.archive.update_size_based_archive(ind)
-                else:
+                elif ARCHIVE_TYPE == "dist":
                     self.archive.update_dist_based_archive(ind)
-                # self.archive.update_dist_based_archive(ind)
+                else:
+                    raise ValueError(f"Invalid ARCHIVE_TYPE value: {ARCHIVE_TYPE}")
 
     # Called at each gen, even if data is not modified
     def update_data_to_plot(self, individuals: list[Individual]):
@@ -322,7 +333,7 @@ class GeneticAlgorithm:
         print("Generating initial population")
         population: list[Individual] = self.create_population(POPSIZE)
         if len(population) < POPSIZE:
-            print(f"Warning: only {len(population)}/{POPSIZE} individuals created")
+            print(f"Warning - only {len(population)}/{POPSIZE} individuals created")
 
         # Initial evaluation
         self.evaluate_batch(population)
@@ -352,10 +363,9 @@ class GeneticAlgorithm:
             offspring = [self.clone_individual(ind) for ind in offspring]
 
             # 2. Reseeding
-            if len(self.archive.get_archive()) > 0 and gen % RESEED_INTERVAL == 0:
-                n_reseed = random.randint(
-                    1, min(RESEEDUPPERBOUND, len(population) // 4)
-                )
+            # Use gen % RESEED_INTERVAL == 0 to have less aggressive reseeding
+            if len(self.archive.get_archive()) > 0:
+                n_reseed = random.randint(1, RESEEDUPPERBOUND)
                 population = self.reseed_population(population, n_reseed)
 
             # 3. Mutation
@@ -417,15 +427,12 @@ class GeneticAlgorithm:
 if __name__ == "__main__":
     from folder import Folder
     from utils import print_archive_experiment
-    import config
 
-    for i in range(2):
-        Folder.initialize()
+    Folder.initialize()
 
-        ga = GeneticAlgorithm()
-        population, archive = ga.run()
+    ga = GeneticAlgorithm()
+    population, archive = ga.run()
 
-        print("\n### FINAL ARCHIVE")
-        print_archive_experiment(archive.get_archive())
-        print("GAME OVER")
-        config.TRYNEW = not config.TRYNEW  # toggle method for next run
+    print("\n### FINAL ARCHIVE")
+    print_archive_experiment(archive.get_archive())
+    print("GAME OVER")

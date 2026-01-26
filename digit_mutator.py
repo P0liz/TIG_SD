@@ -28,6 +28,9 @@ class DigitMutator:
 
         # Mutazione nel latent space
         mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size)
+        print(
+            f"Latent stats - min: {mutated_latent.min():.2f}, max: {mutated_latent.max():.2f}, std: {mutated_latent.std():.2f}"
+        )
 
         # Circular walk mutation
         # mutated_latent = mutation_manager.mutate_circular( self.digit.latent, step, noise_x, noise_y)

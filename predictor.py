@@ -28,7 +28,7 @@ class Predictor:
         # label, confidence = simple_confidence_margin(logits)
 
         # margin between expected and top logits
-        label, confidence = normalized_confidence_margin(logits, exp_label)
+        label, confidence = confidence_margin(logits, exp_label)
         # label, confidence = comparison_confidence_helper(logits, exp_label)
 
         return label, confidence
@@ -44,7 +44,7 @@ class Predictor:
         predictions = []
         confidences = []
         for logits, exp_label in zip(batch_logits, exp_labels):
-            label, confidence = normalized_confidence_margin(logits, exp_label)
+            label, confidence = confidence_margin(logits, exp_label)
             # label, confidence = comparison_confidence_helper(logits, exp_label)
             predictions.append(label)
             confidences.append(confidence)

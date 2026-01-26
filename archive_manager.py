@@ -6,7 +6,7 @@ from os.path import join
 from folder import Folder
 from timer import Timer
 from utils import get_distance, get_diameter, get_radius_reference
-from evaluator import eval_archive_dist, evaluate_sparseness, dist_from_nearest_archived
+from evaluator import eval_archive_dist, evaluate_sparseness
 from data_visualization import plot_labels
 import numpy as np
 from individual import Individual
@@ -24,7 +24,6 @@ from config import (
     STEPSIZE,
     DISTANCE_METRIC,
     TARGET_SIZE,
-    K,
 )
 
 
@@ -48,35 +47,25 @@ class Archive:
             # archive is empty
             if len(self.archive) == 0:
                 print(
-                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} first added to archive"
                 )
                 self.archive.append(ind)
                 self.archived_labels.add(ind.m1.expected_label)
             else:
                 # Find the member of the archive that is closest to the candidate.
-                # d_min = evaluate_sparseness(ind, self.archive)    # previous
-                d_min, c = dist_from_nearest_archived(ind, self.archive, K)
+                d_min, c = evaluate_sparseness(ind, self.archive)
                 # archive is not full
                 if len(self.archive) / self.target_size < 1:
                     # not the same sparseness
                     if d_min > 0:
                         print(
-                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} newly added to archive"
                         )
                         self.archive.append(ind)
                         self.archived_labels.add(ind.m1.expected_label)
 
                 # archive is full
                 else:
-                    # TODO: to prioritize diversity would be better to use as PK +sparseness
-                    """# previous
-                    # find the individual with the most distant members and smallest sparseness
-                    c: Individual = sorted(
-                        self.archive,
-                        key=lambda x: (getattr(x, self.distance_input), -x.sparseness),
-                        reverse=True,
-                    )[0]
-                    """
                     # replace c if ind has closer members
                     if getattr(c, self.distance_input) > getattr(
                         ind, self.distance_input
@@ -90,6 +79,7 @@ class Archive:
                         self.archive.remove(c)
                         self.archive.append(ind)
                         self.archived_labels.add(ind.m1.expected_label)
+                    # TODO: review because the cases below are almost never reached
                     elif getattr(c, self.distance_input) == getattr(
                         ind, self.distance_input
                     ):
@@ -135,8 +125,8 @@ class Archive:
                     if distance_archived < d_min:
                         closest_archived = self.archive[i]
                         d_min = distance_archived
-                        print(f"New min distance: {d_min}")
                     i += 1
+                print(f"New min distance: {d_min}")
                 # Decide whether to add the candidate to the archive
                 # Verify whether the candidate is close to the existing member of the archive
                 # Note: 'close' is defined according to a user-defined threshold
@@ -299,13 +289,13 @@ class Archive:
                             "gen",
                             "pop_evals",
                             "pop_archived",
-                            "covered_labels",
-                            "min_obj1",
-                            "min_obj2",
-                            "max_obj1",
-                            "max_obj2",
-                            "avg_obj1",
-                            "avg_obj2",
+                            "archived_labels",
+                            "min_aggregate_ff",
+                            "min_misclass",
+                            "max_aggregate_ff",
+                            "max_misclass",
+                            "avg_aggregate_ff",
+                            "avg_misclass",
                         ]
                     )
 

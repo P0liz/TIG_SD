@@ -14,7 +14,7 @@ def evaluate_ff2(confidence1, confidence2):
     P3 = confidence1 * confidence2
 
     if P3 < 0:
-        P3 = -0.1
+        P3 = -1
     return P3
 
 
@@ -48,16 +48,20 @@ def dist_from_nearest_archived(ind: Individual, population, k):
     return dist, nns[0][1]
 
 
-def evaluate_sparseness(ind, individuals):
+def evaluate_sparseness(self, ind, individuals):
     N = len(individuals)
     # Sparseness is evaluated only if the archive is not empty
     # Otherwise the sparseness is 1
     if (N == 0) or (N == 1 and individuals[0] == ind):
-        sparseness = 1
+        ind.sparseness = np.inf
+        closest = ind
+    elif N == 2:
+        ind.sparseness, closest = self.dist_from_nearest_archived(ind, individuals, K)
+        individuals[0].sparseness = ind.sparseness
+        individuals[1].sparseness = ind.sparseness
     else:
-        sparseness, _ = dist_from_nearest_archived(ind, individuals, K)
-
-    return sparseness
+        ind.sparseness, closest = self.dist_from_nearest_archived(ind, individuals, K)
+    return ind.sparseness, closest
 
 
 # Distance between two individuals for archive management

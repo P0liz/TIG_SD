@@ -51,13 +51,15 @@ class Individual:
             "id": str(self.id),
             "expected_label": str(self.m1.expected_label),
             "misclass": str(self.misclass),
+            "m1_confidence": str(self.m1.confidence),
+            "m2_confidence": str(self.m2.confidence),
             "aggregate_ff": str(self.aggregate_ff),
             "sparseness": str(self.sparseness),
-            "misstep": str(self.misstep),
-            "bad_prediction": str(self.bad_prediction),
             "members_distance": str(self.members_distance),
             "members_img_euc_dist": str(self.members_img_euc_dist),
             "members_latent_cos_sim": str(self.members_latent_cos_sim),
+            "misstep": str(self.misstep),
+            "bad_prediction": str(self.bad_prediction),
         }
 
     def export(self):
@@ -143,7 +145,7 @@ class Individual:
         setattr(self, distance_attr, evaluator.evaluate_ff1(self.m1, self.m2))
 
         # Recalculate sparseness at each iteration (to reflect changes in archive)
-        self.sparseness = evaluator.evaluate_sparseness(self, archive)
+        self.sparseness, _ = evaluator.evaluate_sparseness(self, archive)
         if self.sparseness == 0.0:
             print(self.sparseness)
             print("BUG")
