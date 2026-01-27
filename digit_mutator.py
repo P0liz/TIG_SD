@@ -23,11 +23,11 @@ class DigitMutator:
         base_delta = DELTA
         if self.digit.standing_steps >= STANDING_STEP_LIMIT:
             base_delta = DELTA * (self.digit.standing_steps / STANDING_STEP_LIMIT + 1)
-        # perturbation_size = base_delta * exp(self.digit.confidence)   # Old method
         perturbation_size = base_delta  # understand if this should change
         print(f"Perturbation size: {perturbation_size:.3f}")
 
         # Mutazione nel latent space
+        # TODO: consider clamping latent vector values to (-5,5) to avoid strange values
         mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size)
         print(
             f"Latent stats - min: {mutated_latent.min():.2f}, max: {mutated_latent.max():.2f}, std: {mutated_latent.std():.2f}"

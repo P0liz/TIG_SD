@@ -69,6 +69,9 @@ class Archive:
 
                 # archive is full
                 else:
+                    # TODO: add some kind of diversity bonus?
+                    # diversity_bonus = 1.0 / (1.0 + label_count)  # Lower count = higher bonus
+                    # ind_score = getattr(ind, self.distance_input) - diversity_bonus
                     # replace c if ind has closer members
                     if getattr(c, self.distance_input) > getattr(
                         ind, self.distance_input
@@ -110,6 +113,10 @@ class Archive:
                                 self.archive.remove(c)
                                 self.archive.append(ind)
                                 self.archived_labels.add(ind.m1.expected_label)
+                    else:
+                        print(
+                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label}, {ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} not added to archive"
+                        )
 
     def update_dist_based_archive(self, ind: "Individual"):
         if ind not in self.archive:

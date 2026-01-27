@@ -54,11 +54,12 @@ class GeneticAlgorithm:
     ):
         """
         Generate a member with Stable Diffusion and Validate it if possible
+        Starting with higher guidance_scale to get more realistic outputs
         Args:
             prompt (_type_): _description_
             expected_label (_type_): _description_
             latent (_type_): _description_
-            guidance_scale (float, optional): _description_. Defaults to 3.5.
+            guidance_scale (float, optional): set how strongly prompt is followed. Defaults to 3.5
             max_attempts (int, optional): _description_. Defaults to 10.
 
         Returns:
@@ -109,7 +110,7 @@ class GeneticAlgorithm:
         m1 = self.generate_member(prompt, label)
         if m1 is None:
             # Riprova con guidance più alta
-            m1 = self.generate_member(prompt, label, guidance_scale=5.0)
+            m1 = self.generate_member(prompt, label, guidance_scale=4.5)
             if m1 is None:
                 raise ValueError(f"Cannot create individual for label {label}")
 
@@ -289,28 +290,42 @@ class GeneticAlgorithm:
 
             try:
                 population[idx] = self.create_individual(label=new_label)
-                print("Reseeded individual")
+                print(
+                    f"Reseeding: Added new individual with label {population[idx].m1.expected_label}"
+                )
             except ValueError:
                 print(
                     f"Failed to reseed individual {population[idx].id}, keeping the old one"
                 )
 
         # Population cut
-        # if a label is over 50% of population remove all those individuals
-        count = []
+        # if a label is equal or over 50% of population remove all those individuals
+        count = [0] * len(PROMPTS)
         for pop in population:
             idx = pop.m1.expected_label
             count[idx] += 1
-            if count[idx] > len(population) / 2:
+            if count[idx] >= len(population) / 2:
                 # remove all individuals with that label
                 population = [ind for ind in population if ind.m1.expected_label != idx]
+                print(f"Reseeding: Cut population to remove label {idx}")
                 # add new ones
                 try:
-                    for i in POPSIZE - len(population):
-                        new_ind = self.create_individual()
+                    for i in range(POPSIZE - len(population)):
+                        unused_labels.remove(idx)
+                        if len(unused_labels) > 0:
+                            new_label = random.choice(list(unused_labels))
+                            unused_labels.remove(new_label)
+                        else:
+                            new_label = random.randint(0, 9)
+                        new_ind = self.create_individual(label=new_label)
                         population.append(new_ind)
+                        print(
+                            f"Reseeding: Added new individual with label {new_ind.m1.expected_label}"
+                        )
                 except ValueError:
                     print(f"Failed to create new individual after population cut")
+                finally:
+                    break
 
         return population
 
@@ -443,11 +458,12 @@ if __name__ == "__main__":
     from folder import Folder
     from utils import print_archive_experiment
 
-    Folder.initialize()
+    for i in range(0, 3):
+        Folder.initialize()
 
-    ga = GeneticAlgorithm()
-    population, archive = ga.run()
+        ga = GeneticAlgorithm()
+        population, archive = ga.run()
 
-    print("\n### FINAL ARCHIVE")
-    print_archive_experiment(archive.get_archive())
-    print("GAME OVER")
+        print("\n### FINAL ARCHIVE")
+        print_archive_experiment(archive.get_archive())
+        print("GAME OVER")

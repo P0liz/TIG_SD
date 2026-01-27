@@ -9,21 +9,21 @@ SHORT_GEN = True
 
 # Popolazione e generazioni
 if SHORT_GEN:
-    POPSIZE = 8  # Must be divisible by 4
+    POPSIZE = 12  # Must be divisible by 4
     NGEN = 50  # Number of generations
-    RESEED_INTERVAL = 3
-else:
-    POPSIZE = 20  # Must be divisible by 4
-    NGEN = 100  # Number of generations
     RESEED_INTERVAL = 5
+else:
+    POPSIZE = 20
+    NGEN = 100
+    RESEED_INTERVAL = 7
 INITIALPOP = "sequence"  # Or random"
 STEPSIZE = 10
-RESEEDUPPERBOUND = POPSIZE // 4  # Max number of reseed individuals
+RESEEDUPPERBOUND = POPSIZE // 6  # Max number of reseed individuals
 
 # Archive configuration
 # Minimum distance between two individuals to be considered different enough
+ARCHIVE_THRESHOLD = 12  # ATTENTION: this changes with the chosen metric
 ARCHIVE_TYPE = "size"  # Or "dist"
-ARCHIVE_THRESHOLD = 12
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 TARGET_SIZE = (3 * POPSIZE) // 4  # Ideal number of archived individuals
@@ -48,7 +48,7 @@ if SHORT_GEN:
     DELTA = 0.02  # affects perturbation size for mutation
     STANDING_STEP_LIMIT = 2
 else:
-    DELTA = 0.01  # Old method value 0.025
+    DELTA = 0.01
     STANDING_STEP_LIMIT = 3
 DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
 CONF_CHANGE = 1.0  # ATTENTION: this changes with the chosen metric # Or 0.5 Or 0.02
