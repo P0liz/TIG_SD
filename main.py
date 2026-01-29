@@ -299,18 +299,19 @@ class GeneticAlgorithm:
                 )
 
         # Population cut
-        # if a label is equal or over 50% of population remove all those individuals
         count = [0] * len(PROMPTS)
         for pop in population:
             idx = pop.m1.expected_label
             count[idx] += 1
-            if count[idx] >= len(population) / 2:
+            # if a label is equal or over 80% of population remove all those individuals
+            if count[idx] >= len(population) * 0.8:
                 # remove all individuals with that label
                 population = [ind for ind in population if ind.m1.expected_label != idx]
                 print(f"Reseeding: Cut population to remove label {idx}")
                 # add new ones
+                added = POPSIZE - len(population)
                 try:
-                    for i in range(POPSIZE - len(population)):
+                    for i in range(added):
                         unused_labels.remove(idx)
                         if len(unused_labels) > 0:
                             new_label = random.choice(list(unused_labels))
@@ -319,9 +320,7 @@ class GeneticAlgorithm:
                             new_label = random.randint(0, 9)
                         new_ind = self.create_individual(label=new_label)
                         population.append(new_ind)
-                        print(
-                            f"Reseeding: Added new individual with label {new_ind.m1.expected_label}"
-                        )
+                    print(f"Reseeding: Added {added} individuals after pupulation cut")
                 except ValueError:
                     print(f"Failed to create new individual after population cut")
                 finally:
@@ -458,12 +457,11 @@ if __name__ == "__main__":
     from folder import Folder
     from utils import print_archive_experiment
 
-    for i in range(0, 3):
-        Folder.initialize()
+    Folder.initialize()
 
-        ga = GeneticAlgorithm()
-        population, archive = ga.run()
+    ga = GeneticAlgorithm()
+    population, archive = ga.run()
 
-        print("\n### FINAL ARCHIVE")
-        print_archive_experiment(archive.get_archive())
-        print("GAME OVER")
+    print("\n### FINAL ARCHIVE")
+    print_archive_experiment(archive.get_archive())
+    print("GAME OVER")

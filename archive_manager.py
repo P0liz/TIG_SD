@@ -19,14 +19,20 @@ from config import (
     POPSIZE,
     NGEN,
     RESEEDUPPERBOUND,
+    K,
     K_SD,
     CLASSIFIER_WEIGHTS_PATH,
+    LORA_WEIGHTS,
     STOP_CONDITION,
     RUNTIME,
     REPORT_NAME,
     STEPSIZE,
     DISTANCE_METRIC,
     TARGET_SIZE,
+    ARCHIVE_TYPE,
+    RESEED_INTERVAL,
+    DELTA,
+    STANDING_STEP_LIMIT,
 )
 
 
@@ -123,9 +129,12 @@ class Archive:
             if len(self.archive) == 0:
                 self.archive.append(ind)
                 self.archived_labels.add(ind.m1.expected_label)
-                print("Added first member to the archive")
+                print("Added first individual to the archive")
+                print(
+                    f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label} and distance {getattr(ind, self.distance_input)}"
+                )
             else:
-                # Find the member of the archive that is closest to the candidate.
+                # Find the individual of the archive that is closest to the candidate.
                 closest_archived = None
                 d_min = np.inf
                 i = 0
@@ -136,35 +145,38 @@ class Archive:
                         closest_archived = self.archive[i]
                         d_min = distance_archived
                     i += 1
-                print(f"New min distance: {d_min}")
+                print(f"New min distance between individuals: {d_min}")
                 # Decide whether to add the candidate to the archive
-                # Verify whether the candidate is close to the existing member of the archive
+                # Verify whether the candidate is close to the existing individual of the archive
                 # Note: 'close' is defined according to a user-defined threshold
                 if d_min <= ARCHIVE_THRESHOLD:
-                    # The candidate replaces the closest archive member if its members' distance is better
+                    # The candidate replaces the closest archive individual if its members' distance is better
                     print(
-                        "Candidate is close to an existing archive member, updating archive..."
-                    )
-                    print(
-                        f"Old ind labels: exp->{closest_archived.m1.expected_label}, pred->{closest_archived.m1.predicted_label}, {closest_archived.m2.predicted_label}"
+                        "Candidate is close to an existing archive individual, updating archive..."
                     )
                     print(
-                        f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label}"
+                        f"Old ind labels: exp->{closest_archived.m1.expected_label}, pred->{closest_archived.m1.predicted_label}, {closest_archived.m2.predicted_label} and distance {getattr(closest_archived, self.distance_input)} "
                     )
-                    dist_ind = getattr(ind, self.distance_input)
-                    dist_archived_ind = get_distance(
-                        closest_archived.m1,
-                        closest_archived.m2,
+                    print(
+                        f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label} and distance {getattr(ind, self.distance_input)} "
                     )
-                    if dist_ind <= dist_archived_ind:
+                    members_dist_ind = getattr(ind, self.distance_input)
+                    members_dist_archived_ind = getattr(
+                        closest_archived, self.distance_input
+                    )
+                    if members_dist_ind <= members_dist_archived_ind:
                         self.archive.remove(closest_archived)
+                        self.archived_labels.remove(closest_archived.m1.expected_label)
                         self.archive.append(ind)
                         self.archived_labels.add(ind.m1.expected_label)
+                        print("Switching individual in the archive with the new one")
+                    else:
+                        print("Not adding individual to the archive")
                 else:
-                    # Add the candidate to the archive if it is distant from all the other archive members
-                    print("Adding new member to the archive...")
+                    # Add the candidate to the archive if it is distant from all the other archive individuals
+                    print("Adding new individual to the archive...")
                     print(
-                        f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label}"
+                        f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label} and distance {getattr(ind, self.distance_input)}"
                     )
                     self.archive.append(ind)
                     self.archived_labels.add(ind.m1.expected_label)
@@ -240,22 +252,28 @@ class Archive:
             budget = RUNTIME
         else:
             budget = "no budget"
-        # TODO: add stuff
         config = {
             "popsize": str(POPSIZE),
             "budget": str(budget),
             "budget_type": str(STOP_CONDITION),
-            "archive tshd": str(ARCHIVE_THRESHOLD),
-            "reseed": str(RESEEDUPPERBOUND),
-            "K": str(K_SD),
-            "model": str(CLASSIFIER_WEIGHTS_PATH),
+            "archive_type": str(ARCHIVE_TYPE),
+            "distance_metric": str(DISTANCE_METRIC),
+            "archive_tshd": str(ARCHIVE_THRESHOLD),
+            "reseed_interval": str(RESEED_INTERVAL),
+            "reseed_upperbound": str(RESEEDUPPERBOUND),
+            "classifier": str(CLASSIFIER_WEIGHTS_PATH),
+            "SD_model": str(LORA_WEIGHTS),
+            "K": str(K),
+            "K_SD": str(K_SD),
+            "perturbation_size": str(DELTA),
+            "standing_steps_limit": str(STANDING_STEP_LIMIT),
         }
 
         dst = join(Folder.DST, "config.json")
 
         # dst = RESULTS_PATH + '/config.json'
         with open(dst, "w") as f:
-            (json.dump(config, f, sort_keys=True, indent=4))
+            (json.dump(config, f, sort_keys=False, indent=4))
 
         dst = join(Folder.DST, REPORT_NAME)
         with open(dst, mode="a") as report_file:
@@ -325,6 +343,7 @@ class Archive:
                         record["avg"][1],
                     ]
                 )
+        # plot label distribution
         if labels_history is not None:
             dst = join(Folder.DST, "labels_history.png")
             plot_labels(labels_history, dst)

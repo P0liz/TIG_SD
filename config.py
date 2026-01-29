@@ -21,9 +21,10 @@ STEPSIZE = 10
 RESEEDUPPERBOUND = POPSIZE // 6  # Max number of reseed individuals
 
 # Archive configuration
-# Minimum distance between two individuals to be considered different enough
-ARCHIVE_THRESHOLD = 12  # ATTENTION: this changes with the chosen metric
-ARCHIVE_TYPE = "size"  # Or "dist"
+# Minimum distance between two individuals to be considered different enough (the higher the less inds archived)
+# ATTENTION: this changes with the chosen metric
+ARCHIVE_THRESHOLD = 14  # img_euc: 5 # lat_cos: 0.2 # lat_euc: 1.0
+ARCHIVE_TYPE = "dist"  # Or "size"
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 TARGET_SIZE = (3 * POPSIZE) // 4  # Ideal number of archived individuals
@@ -51,7 +52,9 @@ else:
     DELTA = 0.01
     STANDING_STEP_LIMIT = 3
 DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
-CONF_CHANGE = 1.0  # ATTENTION: this changes with the chosen metric # Or 0.5 Or 0.02
+# ATTENTION: this changes with the chosen metric
+CONF_CHANGE = 1.0  # img_euc: 0.5 # lat_cos: 0.02 # lat_euc: 1.0
+
 # Circular walk
 NOISE_SCALE = 0.025
 CIRC_STEPS = 100
