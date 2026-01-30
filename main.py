@@ -242,7 +242,28 @@ class GeneticAlgorithm:
     def evaluate_fitness(self, individuals: list[Individual], gen=0):
         for ind in individuals:
             ind.evaluate(self.archive.get_archive(), gen)
-            ind.fitness.values = (ind.aggregate_ff, ind.misclass)
+
+        # Get min/max dynamically
+        agg_ff_values = [ind.aggregate_ff for ind in individuals]
+        misclass_values = [ind.misclass for ind in individuals]
+        min_agg = min(agg_ff_values)
+        max_agg = max(agg_ff_values)
+        min_mis = min(misclass_values)
+        max_mis = max(misclass_values)
+
+        # Normalize and assign fitness
+        for ind in individuals:
+            norm_agg_ff = (
+                (ind.aggregate_ff - min_agg) / (max_agg - min_agg)
+                if max_agg > min_agg
+                else 0
+            )
+            norm_misclass = (
+                (ind.misclass - min_mis) / (max_mis - min_mis)
+                if max_mis > min_mis
+                else 0
+            )
+            ind.fitness.values = (norm_agg_ff, norm_misclass)
 
     def clone_individual(self, individual: Individual):
         # Clone an individual (deep copy)
@@ -335,6 +356,8 @@ class GeneticAlgorithm:
                     self.archive.update_size_based_archive(ind)
                 elif ARCHIVE_TYPE == "dist":
                     self.archive.update_dist_based_archive(ind)
+                elif ARCHIVE_TYPE == "bucket":
+                    self.archive.update_bucket_archive(ind)
                 else:
                     raise ValueError(f"Invalid ARCHIVE_TYPE value: {ARCHIVE_TYPE}")
 
@@ -357,8 +380,9 @@ class GeneticAlgorithm:
         stats.register("min", np.min, axis=0)
         stats.register("max", np.max, axis=0)
         stats.register("avg", np.mean, axis=0)
+        stats.register("std", np.std, axis=0)
         logbook = tools.Logbook()
-        logbook.header = "gen", "evals", "min", "max", "avg"
+        logbook.header = "gen", "evals", "min", "max", "avg", "std"
 
         print("Generating initial population")
         population: list[Individual] = self.create_population(POPSIZE)

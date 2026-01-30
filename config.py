@@ -23,11 +23,12 @@ RESEEDUPPERBOUND = POPSIZE // 6  # Max number of reseed individuals
 # Archive configuration
 # Minimum distance between two individuals to be considered different enough (the higher the less inds archived)
 # ATTENTION: this changes with the chosen metric
-ARCHIVE_THRESHOLD = 14  # img_euc: 5 # lat_cos: 0.2 # lat_euc: 1.0
-ARCHIVE_TYPE = "dist"  # Or "size"
+ARCHIVE_THRESHOLD = 20  # img_euc: 8 # lat_cos: 0.5 # lat_euc: 20
+ARCHIVE_TYPE = "bucket"  # Or "size" # Or "dist"
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 TARGET_SIZE = (3 * POPSIZE) // 4  # Ideal number of archived individuals
+MAX_BUCKET_SIZE = 2
 
 # Timer
 RUNTIME = 3600

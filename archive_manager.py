@@ -33,6 +33,7 @@ from config import (
     RESEED_INTERVAL,
     DELTA,
     STANDING_STEP_LIMIT,
+    MAX_BUCKET_SIZE,
 )
 
 
@@ -50,6 +51,60 @@ class Archive:
 
     def get_archive(self):
         return self.archive
+
+    # Creating a bucket for a specific label
+    # Same labels compete with each other
+    def update_bucket_archive(self, ind):
+        if ind not in self.archive:
+            bucket = [
+                arc_ind
+                for arc_ind in self.archive
+                if arc_ind.m1.expected_label == ind.m1.expected_label
+            ]
+            if len(bucket) == 0:
+                self.archive.append(ind)
+                self.archived_labels.add(ind.m1.expected_label)
+                print(
+                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} first added to archive"
+                )
+            else:
+                # Find the member of the archive that is closest to the candidate.
+                d_min = np.inf
+                i = 0
+                while i < len(self.archive):
+                    distance_archived = eval_archive_dist(ind, self.archive[i])
+                    if distance_archived < d_min:
+                        d_min = distance_archived
+                    i += 1
+                # Decide whether to add the candidate to the archive
+                # If new distance is not from the same individual
+                if d_min > 0.0:
+                    # reach max bucket size
+                    if len(bucket) < MAX_BUCKET_SIZE:
+                        self.archive.append(ind)
+                        self.archived_labels.add(ind.m1.expected_label)
+                        print(
+                            f"SPACE LEFT IN THE BUCKET FOR LABEL {ind.m1.expected_label}"
+                        )
+                        print(
+                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} newly added to archive"
+                        )
+                    # when bucket is full >>> local competition
+                    elif len(bucket) == MAX_BUCKET_SIZE:
+                        bucket.sort(key=lambda x: getattr(x, self.distance_input))
+                        print(f"MAX BUCKET SIZE FOR LABEL {ind.m1.expected_label}")
+                        tshd = bucket[-1]  # worst ind
+                        if getattr(ind, self.distance_input) < getattr(
+                            tshd, self.distance_input
+                        ):
+                            self.archive.remove(tshd)
+                            print(
+                                f"ind {tshd.id} with exp->{tshd.m1.expected_label} and pred->({tshd.m1.predicted_label},{tshd.m2.predicted_label}), sparseness {tshd.sparseness} and distance {getattr(tshd, self.distance_input)} removed from archive"
+                            )
+                            self.archive.append(ind)
+                            print(
+                                f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
+                            )
 
     def update_size_based_archive(self, ind: "Individual"):
         if ind not in self.archive:
@@ -75,13 +130,28 @@ class Archive:
 
                 # archive is full
                 else:
-                    # TODO: add some kind of diversity bonus?
-                    # diversity_bonus = 1.0 / (1.0 + label_count)  # Lower count = higher bonus
-                    # ind_score = getattr(ind, self.distance_input) - diversity_bonus
+                    # Diversity bonus
+                    distance_range = abs(
+                        getattr(c, self.distance_input)
+                        - getattr(ind, self.distance_input)
+                    )
+                    label_count = sum(
+                        1
+                        for archived_ind in self.archive
+                        if archived_ind.m1.expected_label == ind.m1.expected_label
+                    )
+                    diversity_bonus = (distance_range * 0.1) / (
+                        1.0 + label_count
+                    )  # 10% of range max
+                    print(
+                        f"Distance range: {distance_range}, diversity bonus: {diversity_bonus}"
+                    )
+                    ind_score = getattr(ind, self.distance_input) - diversity_bonus
+                    print(
+                        f"Archive is full, comparing distances: {getattr(c, self.distance_input)} vs {ind_score}"
+                    )
                     # replace c if ind has closer members
-                    if getattr(c, self.distance_input) > getattr(
-                        ind, self.distance_input
-                    ):
+                    if getattr(c, self.distance_input) > ind_score:
                         print(
                             f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
                         )
@@ -169,19 +239,20 @@ class Archive:
                         self.archived_labels.remove(closest_archived.m1.expected_label)
                         self.archive.append(ind)
                         self.archived_labels.add(ind.m1.expected_label)
-                        print("Switching individual in the archive with the new one")
+                        print(
+                            f"Switching individual {closest_archived.id} in the archive with the new one {ind.id}"
+                        )
                     else:
-                        print("Not adding individual to the archive")
+                        print(f"Not adding individual {ind.id} to the archive")
                 else:
                     # Add the candidate to the archive if it is distant from all the other archive individuals
-                    print("Adding new individual to the archive...")
+                    print(f"Adding new individual {ind.id} to the archive...")
                     print(
                         f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label} and distance {getattr(ind, self.distance_input)}"
                     )
                     self.archive.append(ind)
                     self.archived_labels.add(ind.m1.expected_label)
 
-    # TODO: review the entire method
     def create_report(self, labels, generation, logbook=None, labels_history=None):
         # Retrieve the solutions belonging to the archive.
         if generation == STEPSIZE:
@@ -324,6 +395,8 @@ class Archive:
                             "max_misclass",
                             "avg_aggregate_ff",
                             "avg_misclass",
+                            "std_aggregate_ff",
+                            "std_misclass",
                         ]
                     )
 
@@ -341,6 +414,8 @@ class Archive:
                         record["max"][1],
                         record["avg"][0],
                         record["avg"][1],
+                        record["std"][0],
+                        record["std"][1],
                     ]
                 )
         # plot label distribution
