@@ -20,10 +20,12 @@ class DigitMutator:
         """
         # Progressive intensification of perturbation size
         # It is increased by one time every STANDING_STEP_LIMIT standing steps
-        base_delta = DELTA
         if self.digit.standing_steps >= STANDING_STEP_LIMIT:
-            base_delta = DELTA * (self.digit.standing_steps / STANDING_STEP_LIMIT + 1)
-        perturbation_size = base_delta  # understand if this should change
+            perturbation_size = DELTA * (
+                self.digit.standing_steps / STANDING_STEP_LIMIT + 1
+            )
+        else:
+            perturbation_size = DELTA
         print(f"Perturbation size: {perturbation_size:.3f}")
 
         # Mutazione nel latent space

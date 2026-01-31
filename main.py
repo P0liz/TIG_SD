@@ -164,7 +164,7 @@ class GeneticAlgorithm:
     # ========================================================================
     # Mutation
     # ========================================================================
-    def mutate_individual(self, individual: Individual):
+    def mutate_individual(self, individual: "Individual"):
         """
         Mutate a single digit chosen randomly and keep the mutation either way it goes
         Keep track of standing steps to increase mutation size if needed
@@ -196,10 +196,47 @@ class GeneticAlgorithm:
         )
 
     # ========================================================================
+    # Selection
+    # ========================================================================
+    def select_non_dominant_population(self, individuals: list["Individual"]):
+        MAX_IND_PER_LABEL = POPSIZE // 3  # Max one third of the population
+        kept = []
+        overflown = []
+        sorted_pops = selNSGA2(individuals, len(individuals))
+
+        # Selecting only a limited number of individuals per label
+        # selNSGA2 orders by best fronts so the first elements are the best
+        label_count = [0] * len(PROMPTS)
+        for ind in sorted_pops:
+            label = ind.m1.expected_label
+            label_count[label] += 1
+            if label_count[label] <= MAX_IND_PER_LABEL:
+                kept.append(ind)
+            else:
+                overflown.append(ind)
+
+        # Assuring the population to return matches POPSIZE
+        if len(kept) < POPSIZE:
+            n_missing = POPSIZE - len(kept)
+            if len(overflown) >= n_missing:
+                # Fill with individuals from overflown
+                kept.extend(overflown[:n_missing])
+            else:
+                # Not enough overflown, fill with new individuals
+                n_missing = POPSIZE - len(kept)
+                for i in range(n_missing):
+                    new_ind = self.create_individual()
+                    kept.append(new_ind)
+        elif len(kept) > POPSIZE:
+            # Trim to exactly POPSIZE (keep best ones, already sorted)
+            kept = kept[:POPSIZE]
+        return kept
+
+    # ========================================================================
     # Evaluation
     # ========================================================================
 
-    def evaluate_batch(self, individuals: list[Individual]):
+    def evaluate_batch(self, individuals: list["Individual"]):
         """
         Evaluate a batch of individuals.
         Args:
@@ -239,10 +276,12 @@ class GeneticAlgorithm:
             else:
                 member.standing_steps = 0
 
-    def evaluate_fitness(self, individuals: list[Individual], gen=0):
+    def evaluate_fitness(self, individuals: list["Individual"], gen=0):
         for ind in individuals:
             ind.evaluate(self.archive.get_archive(), gen)
+            ind.fitness.values = (ind.aggregate_ff, ind.misclass)
 
+        """ # Normalize fitness values
         # Get min/max dynamically
         agg_ff_values = [ind.aggregate_ff for ind in individuals]
         misclass_values = [ind.misclass for ind in individuals]
@@ -251,7 +290,7 @@ class GeneticAlgorithm:
         min_mis = min(misclass_values)
         max_mis = max(misclass_values)
 
-        # Normalize and assign fitness
+        # Normalize and assign 
         for ind in individuals:
             norm_agg_ff = (
                 (ind.aggregate_ff - min_agg) / (max_agg - min_agg)
@@ -264,8 +303,9 @@ class GeneticAlgorithm:
                 else 0
             )
             ind.fitness.values = (norm_agg_ff, norm_misclass)
+        """
 
-    def clone_individual(self, individual: Individual):
+    def clone_individual(self, individual: "Individual"):
         # Clone an individual (deep copy)
         # Use the new constructor to include the fitness field
         new_ind: Individual = creator.Individual(
@@ -341,15 +381,15 @@ class GeneticAlgorithm:
                             new_label = random.randint(0, 9)
                         new_ind = self.create_individual(label=new_label)
                         population.append(new_ind)
-                    print(f"Reseeding: Added {added} individuals after pupulation cut")
                 except ValueError:
                     print(f"Failed to create new individual after population cut")
                 finally:
+                    print(f"Reseeding: Added {added} individuals after population cut")
                     break
 
         return population
 
-    def update_archive(self, individuals: list[Individual]):
+    def update_archive(self, individuals: list["Individual"]):
         for ind in individuals:
             if ind.archive_candidate:
                 if ARCHIVE_TYPE == "size":
@@ -362,7 +402,7 @@ class GeneticAlgorithm:
                     raise ValueError(f"Invalid ARCHIVE_TYPE value: {ARCHIVE_TYPE}")
 
     # Called at each gen, even if data is not modified
-    def update_data_to_plot(self, individuals: list[Individual]):
+    def update_data_to_plot(self, individuals: list["Individual"]):
         for ind in individuals:
             ind.m1.confidence_history.append(ind.m1.confidence)
             ind.m2.confidence_history.append(ind.m2.confidence)
@@ -385,7 +425,7 @@ class GeneticAlgorithm:
         logbook.header = "gen", "evals", "min", "max", "avg", "std"
 
         print("Generating initial population")
-        population: list[Individual] = self.create_population(POPSIZE)
+        population: list["Individual"] = self.create_population(POPSIZE)
         if len(population) < POPSIZE:
             print(f"Warning - only {len(population)}/{POPSIZE} individuals created")
 
@@ -436,7 +476,8 @@ class GeneticAlgorithm:
             print(f"Archive size: {len(self.archive.get_archive())}")
 
             # 5. Survival selection (NSGA-II)
-            population = selNSGA2(all_individuals, POPSIZE)
+            # population = selNSGA2(all_individuals, POPSIZE)
+            population = self.select_non_dominant_population(all_individuals)
             print(f"Survived: {len(population)} individuals")
             print(" ".join(str(ind.m1.expected_label) for ind in population))
 

@@ -21,14 +21,14 @@ STEPSIZE = 10
 RESEEDUPPERBOUND = POPSIZE // 6  # Max number of reseed individuals
 
 # Archive configuration
-# Minimum distance between two individuals to be considered different enough (the higher the less inds archived)
-# ATTENTION: this changes with the chosen metric
-ARCHIVE_THRESHOLD = 20  # img_euc: 8 # lat_cos: 0.5 # lat_euc: 20
 ARCHIVE_TYPE = "bucket"  # Or "size" # Or "dist"
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 TARGET_SIZE = (3 * POPSIZE) // 4  # Ideal number of archived individuals
 MAX_BUCKET_SIZE = 2
+# Minimum distance between two individuals to be considered different enough (the higher the less inds archived)
+# ATTENTION: this changes with the chosen metric
+ARCHIVE_THRESHOLD = 20  # img_euc: 8 # lat_cos: 0.5 # lat_euc: 20
 
 # Timer
 RUNTIME = 3600
@@ -46,12 +46,8 @@ MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 # LORA_PATH = "./SD_weights"
 LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
-if SHORT_GEN:
-    DELTA = 0.02  # affects perturbation size for mutation
-    STANDING_STEP_LIMIT = 2
-else:
-    DELTA = 0.01
-    STANDING_STEP_LIMIT = 3
+DELTA = 0.025  # affects perturbation size for mutation
+STANDING_STEP_LIMIT = 2
 DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
 # ATTENTION: this changes with the chosen metric
 CONF_CHANGE = 1.0  # img_euc: 0.5 # lat_cos: 0.02 # lat_euc: 1.0

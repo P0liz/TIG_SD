@@ -33,6 +33,10 @@ class SDPipelineManager:
             cls._instance = super(SDPipelineManager, cls).__new__(cls)
         return cls._instance
 
+    # ------------------------------------------------------
+    #   STANDARD IMPLEMENTATION
+    # ------------------------------------------------------
+
     def initialize(self, num_inference_steps=15):
         """Inizializza la pipeline solo la prima volta"""
         if self._initialized:
@@ -68,6 +72,11 @@ class SDPipelineManager:
         if not self._initialized:
             self.initialize()
         return self._pipe
+
+    # ------------------------------------------------------
+    #   CUSTOM IMPLEMENTATION
+    # ------------------------------------------------------
+    # TODO: Load/Init VAE, tokenizer, text_encoder, unet and scheduler and make the accessible from here
 
 
 # Istanza globale singleton
