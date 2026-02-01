@@ -1,119 +1,218 @@
-"""
-# Currently not used in TIG SD project
-# but might be useful for future reference (caching pipeline, diffusion process, etc.)
+# %%writefile diffusion.py
 import torch
-import inspect
-import numpy as np
+from config import (
+    DEVICE,
+    MODEL_ID_PATH,
+    LORA_PATH,
+    LORA_WEIGHTS,
+    DTYPE,
+    VARIANT,
+    PROMPTS,
+)
 
+# standard
 from diffusers import StableDiffusionPipeline
-from diffusers.schedulers import LMSDiscreteScheduler
-DATASET = 'MNIST'
-TORCH_DEVICE='cuda:0' if torch.cuda.is_available() else 'cpu'
-# TODO: set the correct model paths (find models)
-SD_MODEL_PATH='?'
-SD_LORA_PATH='?'
+from diffusers.schedulers import DDIMScheduler
 
-_cached_pipeline = None
+# custom
+from transformers import CLIPTextModel, CLIPTokenizer
+from diffusers import AutoencoderKL, UNet2DConditionModel, PNDMScheduler
+from tqdm.auto import tqdm
+from PIL import Image
 
-@torch.no_grad()
-def diffuse(
-        pipeline,
-        cond_embeddings, # text conditioning, should be (1, 77, 768)
-        cond_latents,    # image conditioning, should be (1, 4, 64, 64)
-        num_inference_steps,
-        guidance_scale,
-        eta,
-    ):
-    '''
-    conducts diffusion process
-    returns: result img in numpy.ndarray shape:(512, 512, 3)
-    '''
-    torch_device = cond_latents.get_device()
 
-    # classifier guidance: add the unconditional embedding
-    max_length = cond_embeddings.shape[1] # 77
-    uncond_input = pipeline.tokenizer([""], padding="max_length", max_length=max_length, return_tensors="pt")
-    uncond_embeddings = pipeline.text_encoder(uncond_input.input_ids.to(torch_device))[0]
-    text_embeddings = torch.cat([uncond_embeddings, cond_embeddings])
+# Using Stable diffusion pipeline
+class SDPipelineManager:
+    """Singleton per gestire la pipeline Stable Diffusion"""
 
-    # if we use LMSDiscreteScheduler, make sure latents are mulitplied by sigmas
-    if isinstance(pipeline.scheduler, LMSDiscreteScheduler):
-        cond_latents = cond_latents * pipeline.scheduler.sigmas[0]
+    _instance = None
+    _pipe = None
+    _initialized = False
 
-    # init the scheduler
-    accepts_offset = "offset" in set(inspect.signature(pipeline.scheduler.set_timesteps).parameters.keys())
-    extra_set_kwargs = {}
-    if accepts_offset:
-        extra_set_kwargs["offset"] = 1
-    pipeline.scheduler.set_timesteps(num_inference_steps, **extra_set_kwargs)
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SDPipelineManager, cls).__new__(cls)
+        return cls._instance
 
-    # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
-    # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
-    accepts_eta = "eta" in set(inspect.signature(pipeline.scheduler.step).parameters.keys())
-    extra_step_kwargs = {}
-    if accepts_eta:
-        extra_step_kwargs["eta"] = eta
+    # ------------------------------------------------------
+    #   STANDARD IMPLEMENTATION
+    # ------------------------------------------------------
 
-    for i, t in enumerate(pipeline.scheduler.timesteps):
-        # expand the latents for classifier free guidance
-        latent_model_input = torch.cat([cond_latents] * 2)
-        if isinstance(pipeline.scheduler, LMSDiscreteScheduler):
-            sigma = pipeline.scheduler.sigmas[i]
-            latent_model_input = latent_model_input / ((sigma**2 + 1) ** 0.5)
+    def initialize(self, num_inference_steps=15):
+        """Inizializza la pipeline solo la prima volta"""
+        if self._initialized:
+            print("✓ Using cached Stable Diffusion pipeline")
+            return self._pipe
 
-        # predict the noise residual
-        noise_pred = pipeline.unet(latent_model_input, t, encoder_hidden_states=text_embeddings)["sample"]
+        print("Loading Stable Diffusion pipeline...")
 
-        # cfg
-        noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-        noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+        # Load pipeline
+        self._pipe = StableDiffusionPipeline.from_pretrained(
+            MODEL_ID_PATH, variant=VARIANT, torch_dtype=DTYPE, safety_checker=None
+        ).to(DEVICE)
+        print("Loaded Stable Diffusion model")
 
-        # compute the previous noisy sample x_t -> x_t-1
-        cond_latents = pipeline.scheduler.step(noise_pred, t, cond_latents, **extra_step_kwargs)["prev_sample"]
+        # Load LoRA weights
+        self._pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
+        print("Loaded LoRA weights")
 
-    # scale and decode the latents to get the image tensor
-    image = pipeline.vae.decode(cond_latents / pipeline.vae.config.scaling_factor).sample
+        # Configure scheduler (only once)
+        self._pipe.scheduler = DDIMScheduler.from_config(
+            self._pipe.scheduler.config, rescale_betas_zero_snr=True
+        )
+        print("Configured scheduler")
 
-    # generate output numpy image as uint8
-    image = (image / 2 + 0.5).clamp(0, 1)
-    image = image.cpu().permute(0, 2, 3, 1).numpy()
-    image = (image[0] * 255).astype(np.uint8)
+        self.num_inference_steps = num_inference_steps
+        self._initialized = True
 
-    return image
+        print("Pipeline ready for inference")
+        return self._pipe
 
-def load_pipeline():
-    lms = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
-    pipeline = StableDiffusionPipeline.from_pretrained(SD_MODEL_PATH, scheduler=lms, safety_checker=None)
-    if DATASET == 'MNIST':
-        pipeline.load_lora_weights(SD_LORA_PATH)
-    pipeline.to(TORCH_DEVICE)
+    def get_pipe(self):
+        """Ottieni la pipeline (inizializza se necessario)"""
+        if not self._initialized:
+            self.initialize()
+        return self._pipe
 
-    return pipeline
+    # ------------------------------------------------------
+    #   CUSTOM IMPLEMENTATION
+    # ------------------------------------------------------
+    vae = None
+    tokenizer = None
+    text_encoder = None
+    unet = None
+    scheduler = None
+
+    def initialize_custom(self):
+        """Inizializza i componenti personalizzati della pipeline"""
+
+        print("Loading custom components...")
+
+        # Load VAE
+        self.vae = AutoencoderKL.from_pretrained(
+            MODEL_ID_PATH,
+            subfolder="vae",
+            variant=VARIANT,
+            torch_dtype=DTYPE,
+            use_safetensors=True,
+        ).to(DEVICE)
+        print("Loaded VAE")
+
+        # Load tokenizer
+        self.tokenizer = CLIPTokenizer.from_pretrained(
+            MODEL_ID_PATH, subfolder="tokenizer", variant=VARIANT
+        )
+        print("Loaded tokenizer")
+
+        # Load text encoder
+        self.text_encoder = CLIPTextModel.from_pretrained(
+            MODEL_ID_PATH,
+            subfolder="text_encoder",
+            variant=VARIANT,
+            torch_dtype=DTYPE,
+            use_safetensors=True,
+        ).to(DEVICE)
+        print("Loaded text encoder")
+
+        # Load unet
+        self.unet = UNet2DConditionModel.from_pretrained(
+            MODEL_ID_PATH,
+            subfolder="unet",
+            variant=VARIANT,
+            torch_dtype=DTYPE,
+            use_safetensors=True,
+        ).to(DEVICE)
+        print("Loaded unet")
+
+        # TODO: Understand differences between schedulers
+        # TODO: should I change it ?
+        # Load scheduler
+        self.scheduler = DDIMScheduler.from_pretrained(
+            MODEL_ID_PATH,
+            subfolder="scheduler",
+            rescale_betas_zero_snr=True,
+        )
+        print("Loaded scheduler")
+
+
+# Istanza globale singleton
+pipeline_manager = SDPipelineManager()
+
 
 def get_pipeline():
-    global _cached_pipeline
-    if _cached_pipeline is None:
-        _cached_pipeline = load_pipeline()
-    return _cached_pipeline
+    """Funzione helper per ottenere la pipeline"""
+    return pipeline_manager.get_pipe()
 
-def generate(prompt, seed=42, mutate='False',
-             mutated_latent=None, num_inference_steps=40, guidance_scale=7.5, eta=0.0, width=512, height=512):
-    '''
-    create image by diffusion (for each digit)
-    returns:
-        cond_latent: latent space (1, 4, 64, 64)
-        result img in numpy.ndarray shape:(512, 512, 3)
-    '''
-    #assert torch.cuda.is_available()
-    assert height % 8 == 0 and width % 8 == 0
-    pipeline = get_pipeline()
-    text_input = pipeline.tokenizer(prompt, padding="max_length", max_length=pipeline.tokenizer.model_max_length, truncation=True, return_tensors="pt")
-    cond_embeddings = pipeline.text_encoder(text_input.input_ids.to(TORCH_DEVICE))[0]  # shape [1, 77, 768]
-    if mutate == 'True':
-        cond_latent = mutated_latent
-    else:
-        torch.manual_seed(seed)
-        cond_latent = torch.randn((1, pipeline.unet.in_channels, height // 8, width // 8), device=TORCH_DEVICE)
-    image = diffuse(pipeline, cond_embeddings, cond_latent, num_inference_steps, guidance_scale, eta)
-    return cond_latent, image
-"""
+
+def text_embeddings(prompt):
+    BATCH_SIZE = len(PROMPTS)
+    # Generate embeddings for the prompt
+    text_input = pipeline_manager.tokenizer(
+        prompt,
+        padding="max_length",
+        max_length=pipeline_manager.tokenizer.model_max_length,
+        truncation=True,
+        return_tensors="pt",
+    )
+    with torch.no_grad():
+        text_embeddings = pipeline_manager.text_encoder(
+            text_input.input_ids.to(DEVICE)
+        )[0]
+
+    # Generate the unconditional text embeddings
+    max_length = text_input.input_ids.shape[-1]
+    uncond_input = pipeline_manager.tokenizer(
+        [""] * BATCH_SIZE,
+        padding="max_length",
+        max_length=max_length,
+        return_tensors="pt",
+    )
+    uncond_embeddings = pipeline_manager.text_encoder(
+        uncond_input.input_ids.to(DEVICE)
+    )[0]
+    # Concatenate the unconditional and conditional embeddings
+    text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
+    return text_embeddings
+
+
+def denoise(latent, text_embeddings, guidance_scale=2.5, num_inference_steps=15):
+    scheduler = pipeline_manager.scheduler
+    # scaling the input with the initial noise distribution
+    latent = latent * scheduler.init_noise_sigma
+
+    # TODO: set custom timesteps
+    scheduler.set_timesteps(num_inference_steps)
+
+    for t in tqdm(scheduler.timesteps):
+        # expand the latents if we are doing classifier-free guidance to avoid doing two forward passes.
+        latent_model_input = torch.cat([latent] * 2)
+
+        latent_model_input = scheduler.scale_model_input(latent_model_input, timestep=t)
+
+        # predict the noise residual
+        with torch.no_grad():
+            noise_pred = pipeline_manager.unet(
+                latent_model_input, t, encoder_hidden_states=text_embeddings
+            ).sample
+
+        # perform guidance
+        noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+        noise_pred = noise_pred_uncond + guidance_scale * (
+            noise_pred_text - noise_pred_uncond
+        )
+
+        # compute the previous noisy sample x_t -> x_t-1
+        latent = scheduler.step(noise_pred, t, latent).prev_sample
+        return latent
+
+
+def decode_image(latents):
+    # Scale and decode the image latents with vae
+    latents = 1 / 0.18215 * latents
+    with torch.no_grad():
+        image = pipeline_manager.vae.decode(latents).sample
+    # Convert to PIL Image
+    image = (image / 2 + 0.5).clamp(0, 1).squeeze()
+    image = (image.permute(1, 2, 0) * 255).to(torch.uint8).cpu().numpy()
+    image = Image.fromarray(image)
+    return image

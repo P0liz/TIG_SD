@@ -8,7 +8,7 @@ from individual import Individual
 from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
-from mutation_manager import get_pipeline
+from diffusion import get_pipeline
 from data_visualization import export_as_gif, plot_confidence, plot_distance
 from config import DEVICE, HEIGHT, WIDTH, DTYPE, TRYNEW, NGEN, MUTATION_TYPE
 

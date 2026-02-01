@@ -64,9 +64,7 @@ class Archive:
             if len(bucket) == 0:
                 self.archive.append(ind)
                 self.archived_labels.add(ind.m1.expected_label)
-                print(
-                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} first added to archive"
-                )
+                self.print_helper(ind, "first added")
             else:
                 # Find the member of the archive that is closest to the candidate.
                 d_min = np.inf
@@ -83,36 +81,28 @@ class Archive:
                     if len(bucket) < MAX_BUCKET_SIZE:
                         self.archive.append(ind)
                         self.archived_labels.add(ind.m1.expected_label)
-                        print(
-                            f"SPACE LEFT IN THE BUCKET FOR LABEL {ind.m1.expected_label}"
-                        )
-                        print(
-                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} newly added to archive"
-                        )
-                    # when bucket is full >>> local competition
+                        # print(f"SPACE LEFT IN THE BUCKET FOR LABEL {ind.m1.expected_label}")
+                        self.print_helper(ind, "newly added")
+                    # when bucket is full >>> local competition between new and worst
                     elif len(bucket) == MAX_BUCKET_SIZE:
                         bucket.sort(key=lambda x: getattr(x, self.distance_input))
-                        print(f"MAX BUCKET SIZE FOR LABEL {ind.m1.expected_label}")
+                        # print(f"MAX BUCKET SIZE FOR LABEL {ind.m1.expected_label}")
                         tshd = bucket[-1]  # worst ind
                         if getattr(ind, self.distance_input) < getattr(
                             tshd, self.distance_input
                         ):
                             self.archive.remove(tshd)
-                            print(
-                                f"ind {tshd.id} with exp->{tshd.m1.expected_label} and pred->({tshd.m1.predicted_label},{tshd.m2.predicted_label}), sparseness {tshd.sparseness} and distance {getattr(tshd, self.distance_input)} removed from archive"
-                            )
+                            self.print_helper(tshd, "removed")
+                            self.archived_labels.remove(tshd.m1.expected_label)
                             self.archive.append(ind)
-                            print(
-                                f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
-                            )
+                            self.print_helper(ind, "added")
+                            self.archived_labels.add(ind.m1.expected_label)
 
     def update_size_based_archive(self, ind: "Individual"):
         if ind not in self.archive:
             # archive is empty
             if len(self.archive) == 0:
-                print(
-                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} first added to archive"
-                )
+                self.print_helper(ind, "first added")
                 self.archive.append(ind)
                 self.archived_labels.add(ind.m1.expected_label)
             else:
@@ -122,9 +112,7 @@ class Archive:
                 if len(self.archive) / self.target_size < 1:
                     # not the same sparseness
                     if d_min > 0:
-                        print(
-                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} newly added to archive"
-                        )
+                        self.print_helper(ind, "newly added")
                         self.archive.append(ind)
                         self.archived_labels.add(ind.m1.expected_label)
 
@@ -152,14 +140,11 @@ class Archive:
                     )
                     # replace c if ind has closer members
                     if getattr(c, self.distance_input) > ind_score:
-                        print(
-                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
-                        )
-                        print(
-                            f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}), sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
-                        )
                         self.archive.remove(c)
+                        self.print_helper(c, "removed")
+                        self.archived_labels.remove(c.m1.expected_label)
                         self.archive.append(ind)
+                        self.print_helper(ind, "added")
                         self.archived_labels.add(ind.m1.expected_label)
                     # TODO: review because the cases below are almost never reached
                     elif getattr(c, self.distance_input) == getattr(
@@ -167,42 +152,31 @@ class Archive:
                     ):
                         # ind has better performance
                         if ind.misclass < c.misclass:
-                            print(
-                                f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
-                            )
-                            print(
-                                f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}), sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
-                            )
                             self.archive.remove(c)
+                            self.print_helper(c, "removed")
+                            self.archived_labels.remove(c.m1.expected_label)
                             self.archive.append(ind)
+                            self.print_helper(ind, "added")
                             self.archived_labels.add(ind.m1.expected_label)
                         # c and ind have the same performance
                         elif ind.misclass == c.misclass:
                             # ind has better sparseness
                             if d_min > c.sparseness:
-                                print(
-                                    f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} added to archive"
-                                )
-                                print(
-                                    f"ind {c.id} with exp->{c.m1.expected_label} and pred->({c.m1.predicted_label},{c.m2.predicted_label}), sparseness {c.sparseness} and distance {getattr(c, self.distance_input)} removed from archive"
-                                )
                                 self.archive.remove(c)
+                                self.print_helper(c, "removed")
+                                self.archived_labels.remove(c.m1.expected_label)
                                 self.archive.append(ind)
+                                self.print_helper(ind, "added")
                                 self.archived_labels.add(ind.m1.expected_label)
                     else:
-                        print(
-                            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label}, {ind.m2.predicted_label}), sparseness {ind.sparseness} and distance {getattr(ind, self.distance_input)} not added to archive"
-                        )
+                        self.print_helper(ind, "not added")
 
     def update_dist_based_archive(self, ind: "Individual"):
         if ind not in self.archive:
             if len(self.archive) == 0:
                 self.archive.append(ind)
                 self.archived_labels.add(ind.m1.expected_label)
-                print("Added first individual to the archive")
-                print(
-                    f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label} and distance {getattr(ind, self.distance_input)}"
-                )
+                self.print_helper(ind, "first added")
             else:
                 # Find the individual of the archive that is closest to the candidate.
                 closest_archived = None
@@ -225,10 +199,7 @@ class Archive:
                         "Candidate is close to an existing archive individual, updating archive..."
                     )
                     print(
-                        f"Old ind labels: exp->{closest_archived.m1.expected_label}, pred->{closest_archived.m1.predicted_label}, {closest_archived.m2.predicted_label} and distance {getattr(closest_archived, self.distance_input)} "
-                    )
-                    print(
-                        f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label} and distance {getattr(ind, self.distance_input)} "
+                        f"Comparing distances: {getattr(ind, self.distance_input)} vs {getattr(closest_archived, self.distance_input)}"
                     )
                     members_dist_ind = getattr(ind, self.distance_input)
                     members_dist_archived_ind = getattr(
@@ -236,20 +207,16 @@ class Archive:
                     )
                     if members_dist_ind <= members_dist_archived_ind:
                         self.archive.remove(closest_archived)
+                        self.print_helper(closest_archived, "removed")
                         self.archived_labels.remove(closest_archived.m1.expected_label)
                         self.archive.append(ind)
+                        self.print_helper(ind, "added")
                         self.archived_labels.add(ind.m1.expected_label)
-                        print(
-                            f"Switching individual {closest_archived.id} in the archive with the new one {ind.id}"
-                        )
                     else:
-                        print(f"Not adding individual {ind.id} to the archive")
+                        self.print_helper(ind, "not added")
                 else:
                     # Add the candidate to the archive if it is distant from all the other archive individuals
-                    print(f"Adding new individual {ind.id} to the archive...")
-                    print(
-                        f"New ind labels: exp->{ind.m1.expected_label}, pred->{ind.m1.predicted_label}, {ind.m2.predicted_label} and distance {getattr(ind, self.distance_input)}"
-                    )
+                    self.print_helper(ind, "newly added")
                     self.archive.append(ind)
                     self.archived_labels.add(ind.m1.expected_label)
 
@@ -440,3 +407,8 @@ class Archive:
         stats[2] = np.mean(distances)
         stats[3] = np.std(distances)
         return stats
+
+    def print_helper(self, ind, action):
+        print(
+            f"ind {ind.id} with exp->{ind.m1.expected_label} and pred->({ind.m1.predicted_label},{ind.m2.predicted_label}) and distance {getattr(ind, self.distance_input)} {action}"
+        )

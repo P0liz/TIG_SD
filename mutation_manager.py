@@ -6,86 +6,12 @@ import torch
 import math
 
 from torchvision import transforms
+from diffusion import pipeline_manager, get_pipeline
 from config import (
     DEVICE,
-    MODEL_ID_PATH,
-    LORA_PATH,
-    LORA_WEIGHTS,
-    DTYPE,
-    VARIANT,
     CIRC_STEPS,
     NOISE_SCALE,
 )
-from diffusers import StableDiffusionPipeline
-from diffusers.schedulers import DDIMScheduler
-
-
-# Using Stable diffusion pipeline
-class SDPipelineManager:
-    """Singleton per gestire la pipeline Stable Diffusion"""
-
-    _instance = None
-    _pipe = None
-    _initialized = False
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(SDPipelineManager, cls).__new__(cls)
-        return cls._instance
-
-    # ------------------------------------------------------
-    #   STANDARD IMPLEMENTATION
-    # ------------------------------------------------------
-
-    def initialize(self, num_inference_steps=15):
-        """Inizializza la pipeline solo la prima volta"""
-        if self._initialized:
-            print("✓ Using cached Stable Diffusion pipeline")
-            return self._pipe
-
-        print("Loading Stable Diffusion pipeline...")
-
-        # Load pipeline
-        self._pipe = StableDiffusionPipeline.from_pretrained(
-            MODEL_ID_PATH, variant=VARIANT, torch_dtype=DTYPE, safety_checker=None
-        ).to(DEVICE)
-        print("Loaded Stable Diffusion model")
-
-        # Load LoRA weights
-        self._pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
-        print("Loaded LoRA weights")
-
-        # Configure scheduler (only once)
-        self._pipe.scheduler = DDIMScheduler.from_config(
-            self._pipe.scheduler.config, rescale_betas_zero_snr=True
-        )
-        print("Configured scheduler")
-
-        self.num_inference_steps = num_inference_steps
-        self._initialized = True
-
-        print("Pipeline ready for inference")
-        return self._pipe
-
-    def get_pipe(self):
-        """Ottieni la pipeline (inizializza se necessario)"""
-        if not self._initialized:
-            self.initialize()
-        return self._pipe
-
-    # ------------------------------------------------------
-    #   CUSTOM IMPLEMENTATION
-    # ------------------------------------------------------
-    # TODO: Load/Init VAE, tokenizer, text_encoder, unet and scheduler and make the accessible from here
-
-
-# Istanza globale singleton
-pipeline_manager = SDPipelineManager()
-
-
-def get_pipeline():
-    """Funzione helper per ottenere la pipeline"""
-    return pipeline_manager.get_pipe()
 
 
 def mutate(z_orig, perturbation_size):

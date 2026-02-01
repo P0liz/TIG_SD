@@ -12,7 +12,7 @@ from timer import Timer
 import archive_manager
 import utils
 from individual import Individual
-from mutation_manager import get_pipeline
+from diffusion import get_pipeline
 from config import (
     NGEN,
     POPSIZE,
@@ -198,6 +198,8 @@ class GeneticAlgorithm:
     # ========================================================================
     # Selection
     # ========================================================================
+    # TODO: probably does not work >>> not enough inds of a label to reach archived status
+    # Should try with a bigger population
     def select_non_dominant_population(self, individuals: list["Individual"]):
         MAX_IND_PER_LABEL = POPSIZE // 3  # Max one third of the population
         kept = []
@@ -390,6 +392,7 @@ class GeneticAlgorithm:
         return population
 
     def update_archive(self, individuals: list["Individual"]):
+        print("Updating archive...")
         for ind in individuals:
             if ind.archive_candidate:
                 if ARCHIVE_TYPE == "size":
@@ -476,8 +479,8 @@ class GeneticAlgorithm:
             print(f"Archive size: {len(self.archive.get_archive())}")
 
             # 5. Survival selection (NSGA-II)
-            # population = selNSGA2(all_individuals, POPSIZE)
-            population = self.select_non_dominant_population(all_individuals)
+            population = selNSGA2(all_individuals, POPSIZE)
+            # population = self.select_non_dominant_population(all_individuals)
             print(f"Survived: {len(population)} individuals")
             print(" ".join(str(ind.m1.expected_label) for ind in population))
 
