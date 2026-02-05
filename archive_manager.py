@@ -14,27 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from individual import Individual
 
-from config import (
-    ARCHIVE_THRESHOLD,
-    POPSIZE,
-    NGEN,
-    RESEEDUPPERBOUND,
-    K,
-    K_SD,
-    CLASSIFIER_WEIGHTS_PATH,
-    LORA_WEIGHTS,
-    STOP_CONDITION,
-    RUNTIME,
-    REPORT_NAME,
-    STEPSIZE,
-    DISTANCE_METRIC,
-    TARGET_SIZE,
-    ARCHIVE_TYPE,
-    RESEED_INTERVAL,
-    DELTA,
-    STANDING_STEP_LIMIT,
-    MAX_BUCKET_SIZE,
-)
+from config import *
 
 
 class Archive:
@@ -56,11 +36,7 @@ class Archive:
     # Same labels compete with each other
     def update_bucket_archive(self, ind):
         if ind not in self.archive:
-            bucket = [
-                arc_ind
-                for arc_ind in self.archive
-                if arc_ind.m1.expected_label == ind.m1.expected_label
-            ]
+            bucket = [arc_ind for arc_ind in self.archive if arc_ind.m1.expected_label == ind.m1.expected_label]
             if len(bucket) == 0:
                 self.archive.append(ind)
                 self.archived_labels.add(ind.m1.expected_label)
@@ -72,6 +48,7 @@ class Archive:
                 while i < len(self.archive):
                     distance_archived = eval_archive_dist(ind, self.archive[i])
                     if distance_archived < d_min:
+                        closest = self.archive[i]
                         d_min = distance_archived
                     i += 1
                 # Decide whether to add the candidate to the archive
@@ -79,18 +56,45 @@ class Archive:
                 if d_min > 0.0:
                     # reach max bucket size
                     if len(bucket) < MAX_BUCKET_SIZE:
+                        """EASY ENTER
                         self.archive.append(ind)
                         self.archived_labels.add(ind.m1.expected_label)
                         # print(f"SPACE LEFT IN THE BUCKET FOR LABEL {ind.m1.expected_label}")
                         self.print_helper(ind, "newly added")
+                        """
+                        # HARD ENTER
+                        print(f"New min distance between individuals: {d_min}")
+                        # Decide whether to add the candidate to the archive
+                        # Verify whether the candidate is close to the existing individual of the archive
+                        # Note: 'close' is defined according to a user-defined threshold
+                        if d_min <= ARCHIVE_THRESHOLD:
+                            # The candidate replaces the closest archive individual if its members' distance is better
+                            print("Candidate is close to an existing archive individual, updating archive...")
+                            print(
+                                f"Comparing distances: {getattr(ind, self.distance_input)} vs {getattr(closest, self.distance_input)}"
+                            )
+                            members_dist_ind = getattr(ind, self.distance_input)
+                            members_dist_archived_ind = getattr(closest, self.distance_input)
+                            if members_dist_ind <= members_dist_archived_ind:
+                                self.archive.remove(closest)
+                                self.print_helper(closest, "removed")
+                                self.archived_labels.remove(closest.m1.expected_label)
+                                self.archive.append(ind)
+                                self.print_helper(ind, "added")
+                                self.archived_labels.add(ind.m1.expected_label)
+                            else:
+                                self.print_helper(ind, "not added")
+                        else:
+                            # Add the candidate to the archive if it is distant from all the other archive individuals
+                            self.print_helper(ind, "newly added")
+                            self.archive.append(ind)
+                            self.archived_labels.add(ind.m1.expected_label)
                     # when bucket is full >>> local competition between new and worst
                     elif len(bucket) == MAX_BUCKET_SIZE:
                         bucket.sort(key=lambda x: getattr(x, self.distance_input))
                         # print(f"MAX BUCKET SIZE FOR LABEL {ind.m1.expected_label}")
                         tshd = bucket[-1]  # worst ind
-                        if getattr(ind, self.distance_input) < getattr(
-                            tshd, self.distance_input
-                        ):
+                        if getattr(ind, self.distance_input) < getattr(tshd, self.distance_input):
                             self.archive.remove(tshd)
                             self.print_helper(tshd, "removed")
                             self.archived_labels.remove(tshd.m1.expected_label)
@@ -119,25 +123,14 @@ class Archive:
                 # archive is full
                 else:
                     # Diversity bonus
-                    distance_range = abs(
-                        getattr(c, self.distance_input)
-                        - getattr(ind, self.distance_input)
-                    )
+                    distance_range = abs(getattr(c, self.distance_input) - getattr(ind, self.distance_input))
                     label_count = sum(
-                        1
-                        for archived_ind in self.archive
-                        if archived_ind.m1.expected_label == ind.m1.expected_label
+                        1 for archived_ind in self.archive if archived_ind.m1.expected_label == ind.m1.expected_label
                     )
-                    diversity_bonus = (distance_range * 0.1) / (
-                        1.0 + label_count
-                    )  # 10% of range max
-                    print(
-                        f"Distance range: {distance_range}, diversity bonus: {diversity_bonus}"
-                    )
+                    diversity_bonus = (distance_range * 0.1) / (1.0 + label_count)  # 10% of range max
+                    print(f"Distance range: {distance_range}, diversity bonus: {diversity_bonus}")
                     ind_score = getattr(ind, self.distance_input) - diversity_bonus
-                    print(
-                        f"Archive is full, comparing distances: {getattr(c, self.distance_input)} vs {ind_score}"
-                    )
+                    print(f"Archive is full, comparing distances: {getattr(c, self.distance_input)} vs {ind_score}")
                     # replace c if ind has closer members
                     if getattr(c, self.distance_input) > ind_score:
                         self.archive.remove(c)
@@ -147,9 +140,7 @@ class Archive:
                         self.print_helper(ind, "added")
                         self.archived_labels.add(ind.m1.expected_label)
                     # TODO: review because the cases below are almost never reached
-                    elif getattr(c, self.distance_input) == getattr(
-                        ind, self.distance_input
-                    ):
+                    elif getattr(c, self.distance_input) == getattr(ind, self.distance_input):
                         # ind has better performance
                         if ind.misclass < c.misclass:
                             self.archive.remove(c)
@@ -195,16 +186,12 @@ class Archive:
                 # Note: 'close' is defined according to a user-defined threshold
                 if d_min <= ARCHIVE_THRESHOLD:
                     # The candidate replaces the closest archive individual if its members' distance is better
-                    print(
-                        "Candidate is close to an existing archive individual, updating archive..."
-                    )
+                    print("Candidate is close to an existing archive individual, updating archive...")
                     print(
                         f"Comparing distances: {getattr(ind, self.distance_input)} vs {getattr(closest_archived, self.distance_input)}"
                     )
                     members_dist_ind = getattr(ind, self.distance_input)
-                    members_dist_archived_ind = getattr(
-                        closest_archived, self.distance_input
-                    )
+                    members_dist_archived_ind = getattr(closest_archived, self.distance_input)
                     if members_dist_ind <= members_dist_archived_ind:
                         self.archive.remove(closest_archived)
                         self.print_helper(closest_archived, "removed")
@@ -225,9 +212,7 @@ class Archive:
         if generation == STEPSIZE:
             dst = join(Folder.DST, REPORT_NAME)
             with open(dst, mode="w") as report_file:
-                report_writer = csv.writer(
-                    report_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
-                )
+                report_writer = csv.writer(report_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 # TODO: add stuff
                 report_writer.writerow(
                     [
@@ -315,9 +300,7 @@ class Archive:
 
         dst = join(Folder.DST, REPORT_NAME)
         with open(dst, mode="a") as report_file:
-            report_writer = csv.writer(
-                report_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
-            )
+            report_writer = csv.writer(report_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
             timestamp, elapsed_time = Timer.get_timestamps()
             report_writer.writerow(

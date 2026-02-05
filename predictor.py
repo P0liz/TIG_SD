@@ -11,12 +11,7 @@ class Predictor:
     # Load the pre-trained model.
     classifier = MnistClassifier(img_size=IMG_SIZE).to(DEVICE)
     # Load pretrained model
-    classifier.load_state_dict(
-        torch.load(
-            CLASSIFIER_WEIGHTS_PATH,
-            map_location=DEVICE,
-        )
-    )
+    classifier.load_state_dict(torch.load(CLASSIFIER_WEIGHTS_PATH, map_location=DEVICE))
     classifier.eval()
     print("Loaded classifier")
 
@@ -34,9 +29,7 @@ class Predictor:
         return label, confidence
 
     def predict(members, exp_labels):
-        batch_tensors = torch.stack(
-            [member.image_tensor.squeeze(0) for member in members]
-        ).to(DEVICE)
+        batch_tensors = torch.stack([member.image_tensor.squeeze(0) for member in members]).to(DEVICE)
 
         with torch.no_grad():
             batch_logits = Predictor.classifier(batch_tensors).cpu().numpy()

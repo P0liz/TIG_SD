@@ -47,16 +47,22 @@ class Individual:
 
     def to_dict(self):
         return {
-            "id": str(self.id),
-            "expected_label": str(self.m1.expected_label),
-            "misclass": str(self.misclass),
-            "m1_confidence": str(self.m1.confidence),
-            "m2_confidence": str(self.m2.confidence),
-            "aggregate_ff": str(self.aggregate_ff),
-            "sparseness": str(self.sparseness),
+            "id": self.id,
+            "m1": {
+                "expected_label": self.m1.expected_label,
+                "predicted_label": self.m1.predicted_label,
+                "confidence": float(self.m1.confidence),
+            },
+            "m2": {
+                "expected_label": self.m2.expected_label,
+                "predicted_label": self.m2.predicted_label,
+                "confidence": float(self.m2.confidence),
+            },
             "members_distance": str(self.members_distance),
             "members_img_euc_dist": str(self.members_img_euc_dist),
             "members_latent_cos_sim": str(self.members_latent_cos_sim),
+            "aggregate_ff": str(self.aggregate_ff),
+            "sparseness": str(self.sparseness),
             "misstep": str(self.misstep),
             "bad_prediction": str(self.bad_prediction),
         }
@@ -71,29 +77,32 @@ class Individual:
         # Save metadata
         filedest = join(ind_dir, "data.json")
         with open(filedest, "w") as f:
-            json.dump(self.to_dict(), f, sort_keys=False, indent=4)
+            json.dump(self.to_dict(), f, sort_keys=False, indent=2)
 
         # --- Helper to save a member ---
         def save_member(member, idx):
-            base_name = f"archived_mem{idx}_l_{member.predicted_label}"
+            base_name = f"m{idx}_pred{member.predicted_label}"
             png_path = join(ind_dir, base_name + ".png")
-            npy_path = join(ind_dir, base_name + ".npy")
             conf_path = join(ind_dir, base_name + "_conf.png")
+            latent_path = join(ind_dir, f"m{idx}_latent.npy")
+            image_path = join(ind_dir, f"m{idx}_image.npy")
 
             img_np = member.image_tensor.detach().cpu().numpy().squeeze()
+            lat_np = member.latent.detach().cpu().numpy().squeeze()
 
             # Save image (visual)
             # Rememeber to save image from the preprocessed tensor (already 28x28 grayscale)
             plt.imsave(png_path, img_np, cmap=cm.gray, format="png", vmin=0, vmax=1)
 
-            # Save raw tensor (scientific)
-            np.save(npy_path, img_np)
+            # Save latent and image as .npy files (raw tensors)
+            np.save(latent_path, lat_np)
+            np.save(image_path, img_np)
 
             # Save confidence plot
             plot_confidence(member.confidence_history, conf_path)
 
             # Consistency check
-            assert np.array_equal(img_np, np.load(npy_path))
+            assert np.array_equal(img_np, np.load(image_path))
 
         # Save members
         save_member(self.m1, idx=1)
@@ -103,34 +112,20 @@ class Individual:
         dist_path = join(ind_dir, "members_distance.png")
         dist_img_path = join(ind_dir, "members_img_euc_dist.png")
         cos_sim_path = join(ind_dir, "members_latent_cos_sim.png")
-        plot_distance(
-            self.members_distances, dist_path, "Members Latent Euclidean Distance"
-        )
-        plot_distance(
-            self.members_img_euc_dists,
-            dist_img_path,
-            "Members Image Euclidean Distance",
-        )
-        plot_distance(
-            self.members_latent_cos_sims,
-            cos_sim_path,
-            "Members Latent Cosine Similarity",
-        )
+        plot_distance(self.members_distances, dist_path, "Members Latent Euclidean Distance")
+        plot_distance(self.members_img_euc_dists, dist_img_path, "Members Image Euclidean Distance")
+        plot_distance(self.members_latent_cos_sims, cos_sim_path, "Members Latent Cosine Similarity")
 
     def evaluate(self, archive, step):
         if self.misclass is None:
             # Calculate fitness function 2
-            self.misclass = evaluator.evaluate_ff2(
-                self.m1.confidence, self.m2.confidence
-            )
+            self.misclass = evaluator.evaluate_ff2(self.m1.confidence, self.m2.confidence)
 
             if self.m1.correctly_classified != self.m2.correctly_classified:
                 self.archive_candidate = True
                 self.misstep = step
                 self.bad_prediction = (
-                    self.m1.predicted_label
-                    if not self.m1.correctly_classified
-                    else self.m2.predicted_label
+                    self.m1.predicted_label if not self.m1.correctly_classified else self.m2.predicted_label
                 )
 
         # Get the appropriate distance based on config
@@ -149,9 +144,7 @@ class Individual:
             print(self.sparseness)
             print("BUG")
 
-        self.aggregate_ff = evaluator.evaluate_aggregate_ff(
-            self.sparseness, getattr(self, distance_attr)
-        )
+        self.aggregate_ff = evaluator.evaluate_aggregate_ff(self.sparseness, getattr(self, distance_attr))
 
         return self.aggregate_ff, self.misclass
 

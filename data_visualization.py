@@ -25,11 +25,7 @@ def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
         pil_images += pil_images[2:-1][::-1]
 
     pil_images[0].save(
-        filename,
-        save_all=True,
-        append_images=pil_images[1:],
-        duration=1000 // frames_per_second,
-        loop=0,
+        filename, save_all=True, append_images=pil_images[1:], duration=1000 // frames_per_second, loop=0
     )
 
 

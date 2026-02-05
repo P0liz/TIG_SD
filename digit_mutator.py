@@ -21,9 +21,7 @@ class DigitMutator:
         # Progressive intensification of perturbation size
         # It is increased by one time every STANDING_STEP_LIMIT standing steps
         if self.digit.standing_steps >= STANDING_STEP_LIMIT:
-            perturbation_size = DELTA * (
-                self.digit.standing_steps / STANDING_STEP_LIMIT + 1
-            )
+            perturbation_size = DELTA * (self.digit.standing_steps / STANDING_STEP_LIMIT + 1)
         else:
             perturbation_size = DELTA
         print(f"Perturbation size: {perturbation_size:.3f}")
@@ -39,9 +37,7 @@ class DigitMutator:
         # mutated_latent = mutation_manager.mutate_circular( self.digit.latent, step, noise_x, noise_y)
 
         # Generazione immagine dal latente mutato
-        _, mutated_tensor, image = mutation_manager.generate(
-            prompt, mutated_latent=mutated_latent
-        )
+        _, mutated_tensor, image = mutation_manager.generate(prompt, mutated_latent=mutated_latent)
 
         # Aggiornamento stato
         self.digit.latent = mutated_latent
@@ -51,10 +47,6 @@ class DigitMutator:
         self.digit.reset()
 
     def generate(self, prompt, guidance_scale):
-        _, mutated_tensor, image = mutation_manager.generate(
-            prompt,
-            self.digit.latent,
-            guidance_scale,
-        )
+        _, mutated_tensor, image = mutation_manager.generate(prompt, self.digit.latent, guidance_scale)
         self.digit.image_tensor = mutated_tensor
         self.digit.image = image

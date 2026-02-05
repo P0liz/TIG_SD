@@ -13,23 +13,7 @@ import archive_manager
 import utils
 from individual import Individual
 from diffusion import get_pipeline
-from config import (
-    NGEN,
-    POPSIZE,
-    RESEEDUPPERBOUND,
-    STOP_CONDITION,
-    STEPSIZE,
-    DJ_DEBUG,
-    DEVICE,
-    HEIGHT,
-    WIDTH,
-    DTYPE,
-    RESEED_INTERVAL,
-    PROMPTS,
-    INITIALPOP,
-    ARCHIVE_TYPE,
-    CONF_CHANGE,
-)
+from config import *
 
 
 pipe = get_pipeline()
@@ -49,9 +33,7 @@ class GeneticAlgorithm:
     # Generation
     # ========================================================================
 
-    def generate_member(
-        self, prompt, expected_label, guidance_scale=3.5, max_attempts=10
-    ):
+    def generate_member(self, prompt, expected_label, guidance_scale=3.5, max_attempts=10):
         """
         Generate a member with Stable Diffusion and Validate it if possible
         Starting with higher guidance_scale to get more realistic outputs
@@ -67,11 +49,7 @@ class GeneticAlgorithm:
         """
         for i in range(max_attempts):
             # Generate random latent at every attempt (sometimes too much noise)
-            latent = torch.randn(
-                (1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
-                device=DEVICE,
-                dtype=DTYPE,
-            )
+            latent = torch.randn((1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8), device=DEVICE, dtype=DTYPE)
             # Generate member and classify it
             member = MnistMember(latent, expected_label)
             DigitMutator(member).generate(prompt, guidance_scale=guidance_scale)
@@ -146,10 +124,7 @@ class GeneticAlgorithm:
                 ind = self.create_individual(label=label)
                 population.append(ind)
 
-                print(
-                    f"  [{i+1}/{size}] label={ind.m1.predicted_label}, "
-                    f"conf={ind.m1.confidence:.3f}"
-                )
+                print(f"  [{i+1}/{size}] label={ind.m1.predicted_label}, " f"conf={ind.m1.confidence:.3f}")
 
             except ValueError as e:
                 print(f"Failed to create individual {i+1}: {e}")
@@ -185,15 +160,9 @@ class GeneticAlgorithm:
         individual.reset()  # reset fitness-related fields
 
         # Update distances
-        individual.members_distance = utils.get_distance(
-            member_to_mutate, other_member, "latent_euclidean"
-        )
-        individual.members_img_euc_dist = utils.get_distance(
-            member_to_mutate, other_member, "image_euclidean"
-        )
-        individual.members_latent_cos_sim = utils.get_distance(
-            member_to_mutate, other_member, "latent_cosine"
-        )
+        individual.members_distance = utils.get_distance(member_to_mutate, other_member, "latent_euclidean")
+        individual.members_img_euc_dist = utils.get_distance(member_to_mutate, other_member, "image_euclidean")
+        individual.members_latent_cos_sim = utils.get_distance(member_to_mutate, other_member, "latent_cosine")
 
     # ========================================================================
     # Selection
@@ -265,15 +234,10 @@ class GeneticAlgorithm:
                 member.correctly_classified = True
             else:
                 member.correctly_classified = False
-            print(
-                f"exp: {member.expected_label} -> pred: {pred} (confidence: {conf:.3f})"
-            )
+            print(f"exp: {member.expected_label} -> pred: {pred} (confidence: {conf:.3f})")
 
             # If confidence diff is too low and the new confidence is higher then...
-            if (
-                abs(conf - member.confidence) <= CONF_CHANGE
-                and conf >= member.confidence
-            ):
+            if abs(conf - member.confidence) <= CONF_CHANGE and conf >= member.confidence:
                 member.standing_steps += 1
             else:
                 member.standing_steps = 0
@@ -311,10 +275,7 @@ class GeneticAlgorithm:
         # Clone an individual (deep copy)
         # Use the new constructor to include the fitness field
         new_ind: Individual = creator.Individual(
-            individual.m1.clone(),
-            individual.m2.clone(),
-            individual.prompt,
-            individual.original_noise.clone(),
+            individual.m1.clone(), individual.m2.clone(), individual.prompt, individual.original_noise.clone()
         )
         new_ind.members_distance = individual.members_distance
         new_ind.members_img_euc_dist = individual.members_img_euc_dist
@@ -353,13 +314,9 @@ class GeneticAlgorithm:
 
             try:
                 population[idx] = self.create_individual(label=new_label)
-                print(
-                    f"Reseeding: Added new individual with label {population[idx].m1.expected_label}"
-                )
+                print(f"Reseeding: Added new individual with label {population[idx].m1.expected_label}")
             except ValueError:
-                print(
-                    f"Failed to reseed individual {population[idx].id}, keeping the old one"
-                )
+                print(f"Failed to reseed individual {population[idx].id}, keeping the old one")
 
         # Population cut
         count = [0] * len(PROMPTS)
@@ -402,7 +359,7 @@ class GeneticAlgorithm:
                 elif ARCHIVE_TYPE == "bucket":
                     self.archive.update_bucket_archive(ind)
                 else:
-                    raise ValueError(f"Invalid ARCHIVE_TYPE value: {ARCHIVE_TYPE}")
+                    raise NotImplementedError(f"Invalid ARCHIVE_TYPE value: {ARCHIVE_TYPE}")
 
     # Called at each gen, even if data is not modified
     def update_data_to_plot(self, individuals: list["Individual"]):
@@ -446,9 +403,7 @@ class GeneticAlgorithm:
         labels_history = {0: [ind.m1.expected_label for ind in population]}
 
         if DJ_DEBUG:
-            self.archive.create_report(
-                Individual.USED_LABELS, generation=0, logbook=logbook
-            )
+            self.archive.create_report(Individual.USED_LABELS, generation=0, logbook=logbook)
 
         # Begin the generational process
         gen = 1
@@ -504,9 +459,7 @@ class GeneticAlgorithm:
                 break
 
         # Ending process
-        self.archive.create_report(
-            Individual.USED_LABELS, "final", logbook, labels_history
-        )
+        self.archive.create_report(Individual.USED_LABELS, "final", logbook, labels_history)
 
         print(f"Final statistics:")
         print(f"Individuals created: {Individual.COUNT}")
@@ -524,8 +477,9 @@ class GeneticAlgorithm:
 if __name__ == "__main__":
     from folder import Folder
     from utils import print_archive_experiment
+    import config
 
-    Folder.initialize()
+    Folder.initialize(method=config.ARCHIVE_TYPE)
 
     ga = GeneticAlgorithm()
     population, archive = ga.run()

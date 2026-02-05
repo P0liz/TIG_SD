@@ -4,14 +4,11 @@ import numpy as np
 import cv2
 import torch
 import math
+import random
 
 from torchvision import transforms
 from diffusion import pipeline_manager, get_pipeline
-from config import (
-    DEVICE,
-    CIRC_STEPS,
-    NOISE_SCALE,
-)
+from config import DEVICE, CIRC_STEPS, NOISE_SCALE, DEVICE
 
 
 def mutate(z_orig, perturbation_size):
@@ -25,15 +22,31 @@ def mutate(z_orig, perturbation_size):
     Returns:
         z_mut: torch.Tensor - latent mutato
     """
-    epsilon = torch.randn_like(z_orig)  # randn to have ε ~ N(0, I) noise
+    epsilon = torch.randn_like(z_orig, device=DEVICE)  # randn to have ε ~ N(0, I) noise
     z_mut = z_orig + perturbation_size * epsilon
+    # z_mut = apply_mutation_op1(z_orig)
     return z_mut
 
 
+# Applying mutation only on a random channel, and only on some of its columns
+# TODO: consider applying perturbation_size to have less aggressive mutations?
+def apply_mutation_op1(org_latent, device=DEVICE):
+    mutated_latent = org_latent.clone()
+    target_channel = random.randint(0, 3)
+    num_columns_to_mutate = random.randint(1, 16)
+    selected_columns = random.sample(range(64), num_columns_to_mutate)
+
+    for col in selected_columns:
+        random_factor = torch.randn(1, device=device)
+        while abs(random_factor.item()) > 1.6:
+            random_factor = torch.randn(1, device=device)
+        mutated_latent[:, target_channel, :, col] *= random_factor
+    mutated_latent = torch.clamp(mutated_latent, min=-4.0, max=4.0)
+    return mutated_latent
+
+
 # Circular walk mutation
-def mutate_circular(
-    z_orig, step, noise_x, noise_y, total_steps=CIRC_STEPS, noise_scale=NOISE_SCALE
-):
+def mutate_circular(z_orig, step, noise_x, noise_y, total_steps=CIRC_STEPS, noise_scale=NOISE_SCALE):
     """
     Muta il latent seguendo un punto specifico del percorso circolare
 
@@ -74,9 +87,7 @@ def generate(prompt, mutated_latent=None, guidance_scale=2.5):
         )["images"][0]
 
     # preprocess image to 28x28 grayscale tensor
-    image_tensor = (
-        process_image(image).unsqueeze(0).to(DEVICE)
-    )  # Add batch dimension and move to device
+    image_tensor = process_image(image).unsqueeze(0).to(DEVICE)  # Add batch dimension and move to device
     return mutated_latent, image_tensor, image
 
 
