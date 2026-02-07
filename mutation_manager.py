@@ -7,8 +7,8 @@ import math
 import random
 
 from torchvision import transforms
-from diffusion import pipeline_manager, get_pipeline
-from config import DEVICE, CIRC_STEPS, NOISE_SCALE, DEVICE
+from diffusion import pipeline_manager
+from config import DEVICE, DELTA, STANDING_STEP_LIMIT
 
 
 def mutate(z_orig, perturbation_size):
@@ -28,6 +28,17 @@ def mutate(z_orig, perturbation_size):
     return z_mut
 
 
+def calculate_perturbation_size(standing_steps):
+    # Progressive intensification of perturbation size
+    # It is increased by one time every STANDING_STEP_LIMIT standing steps
+    if standing_steps >= STANDING_STEP_LIMIT:
+        perturbation_size = DELTA * (standing_steps / STANDING_STEP_LIMIT + 1)
+    else:
+        perturbation_size = DELTA
+    print(f"Perturbation size: {perturbation_size:.3f}")
+    return perturbation_size
+
+
 # Applying mutation only on a random channel, and only on some of its columns
 # TODO: consider applying perturbation_size to have less aggressive mutations?
 def apply_mutation_op1(org_latent, device=DEVICE):
@@ -45,26 +56,7 @@ def apply_mutation_op1(org_latent, device=DEVICE):
     return mutated_latent
 
 
-# Circular walk mutation
-def mutate_circular(z_orig, step, noise_x, noise_y, total_steps=CIRC_STEPS, noise_scale=NOISE_SCALE):
-    """
-    Muta il latent seguendo un punto specifico del percorso circolare
-
-    Args:
-        step: int - quale step del walk (0 a total_steps-1)
-        total_steps: int - numero totale di step nel cerchio
-        noise_x, noise_y: torch.Tensor - direzioni di rumore (opzionali, se vuoi riusarle)
-    """
-    t = (step / total_steps) * 2 * math.pi
-    scale_x = math.cos(t)
-    scale_y = math.sin(t)
-
-    z_mut = z_orig + noise_scale * (scale_x * noise_x + scale_y * noise_y)
-
-    return z_mut
-
-
-def generate(prompt, mutated_latent=None, guidance_scale=2.5):
+def generate(prompt, mutated_latent, guidance_scale=2.5):
     """
     Genera un'immagine usando Stable Diffusion
 
@@ -77,7 +69,7 @@ def generate(prompt, mutated_latent=None, guidance_scale=2.5):
         image_tensor: torch.Tensor - immagine preprocessata [1, 1, 28, 28]
         image: PIL.Image - visual image
     """
-    pipe = get_pipeline()
+    pipe = pipeline_manager.pipe
     with torch.inference_mode():
         image = pipe(
             prompt=prompt,

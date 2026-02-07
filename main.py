@@ -154,9 +154,11 @@ class GeneticAlgorithm:
             member_to_mutate = individual.m2
             other_member = individual.m1
 
-        # Mutate and predict
+        # Mutate
         prompt = PROMPTS[member_to_mutate.expected_label]
-        DigitMutator(member_to_mutate).mutate(prompt)
+        mutator = DigitMutator(member_to_mutate)
+        mutator.initial_mutation()  # Mutate latent
+        mutator.generate(prompt)  # Generate new image
         individual.reset()  # reset fitness-related fields
 
         # Update distances

@@ -52,10 +52,6 @@ DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
 # ATTENTION: this changes with the chosen metric
 CONF_CHANGE = 1.0  # img_euc: 0.5 # lat_cos: 0.02 # lat_euc: 1.0
 
-# Circular walk
-NOISE_SCALE = 0.025
-CIRC_STEPS = 100
-
 # Torch settings
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")

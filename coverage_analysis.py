@@ -9,7 +9,7 @@ from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-# === CONFIGURAZIONE ===
+# === CONFIG ===
 SEED = 7  # For reproducibility
 METHODS_TO_COMPARE = {
     "archive_size": "runs/archive_size/run_*/",
@@ -33,7 +33,7 @@ OUTPUT_FOLDER = "diversity_analysis_results"
 Path(OUTPUT_FOLDER).mkdir(exist_ok=True)
 
 
-# === FUNZIONI ===
+# === FUNCTIONS ===
 def cluster_data(data, n_clusters_interval):
     """Trova il numero ottimale di cluster usando silhouette score"""
     assert n_clusters_interval[0] >= 2, "Min number of clusters must be >= 2"
@@ -97,7 +97,7 @@ def load_archived_individuals(folder_pattern, method_name):
             individual_vector = np.concatenate([m1_latent, m2_latent])
 
             # Append to list of all individuals, categorized by method
-            # TODO: in case add other data to use later
+            # in case add other data to use later
             all_individuals.append([individual_vector, method_name])
 
     print(f"  Loaded {len(all_individuals)} individuals")
@@ -215,3 +215,78 @@ if __name__ == "__main__":
         print(f"{method}: {cov:.2f}% coverage")
 
     print(f"\nResults saved to {OUTPUT_FOLDER}/")
+
+# TODO: test clustering with distance between individuals
+# and review the code below
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import silhouette_score
+
+
+def compute_individual_distance_matrix(all_data):
+    """Compute pairwise distance matrix using Individual.distance()"""
+    n = len(all_data)
+    distance_matrix = np.zeros((n, n))
+
+    print("Computing custom distance matrix...")
+    for i in range(n):
+        for j in range(i + 1, n):
+            # Load individuals and compute custom distance
+            ind_i = all_data[i]  # Contains [individual_vector, method_name]
+            ind_j = all_data[j]
+
+            # Extract m1 and m2 latents from concatenated vector
+            latent_dim = len(ind_i[0]) // 2
+            m1_i = ind_i[0][:latent_dim]
+            m2_i = ind_i[0][latent_dim:]
+            m1_j = ind_j[0][:latent_dim]
+            m2_j = ind_j[0][latent_dim:]
+
+            # Compute distance formula
+            a = np.linalg.norm(m1_i - m1_j)  # i1.m1 vs i2.m1
+            b = np.linalg.norm(m1_i - m2_j)  # i1.m1 vs i2.m2
+            c = np.linalg.norm(m2_i - m1_j)  # i1.m2 vs i2.m1
+            d = np.linalg.norm(m2_i - m2_j)  # i1.m2 vs i2.m2
+            dist = np.mean([min(a, b), min(c, d), min(a, c), min(b, d)])
+
+            distance_matrix[i, j] = dist
+            distance_matrix[j, i] = dist
+
+    return distance_matrix
+
+
+def agg_cluster_data(data, n_clusters_interval):
+    """Cluster using precomputed custom distance matrix"""
+    assert n_clusters_interval[0] >= 2, "Min number of clusters must be >= 2"
+
+    # Compute custom distance matrix
+    distance_matrix = compute_individual_distance_matrix(data)
+
+    range_n_clusters = np.arange(n_clusters_interval[0], n_clusters_interval[1])
+    optimal_score = -1
+    optimal_n_clusters = -1
+
+    for n_clusters in range_n_clusters:
+        clusterer = AgglomerativeClustering(n_clusters=n_clusters, metric="precomputed", linkage="average")
+        cluster_labels = clusterer.fit_predict(distance_matrix)
+        silhouette_avg = silhouette_score(distance_matrix, cluster_labels, metric="precomputed")
+        print(f"  n_clusters={n_clusters}, silhouette={silhouette_avg:.3f}")
+
+        if silhouette_avg > optimal_score:
+            optimal_score = silhouette_avg
+            optimal_n_clusters = n_clusters
+
+    assert optimal_n_clusters != -1, "Error in silhouette analysis"
+    print(f"Best: n_clusters={optimal_n_clusters}, score={optimal_score:.3f}")
+
+    clusterer = AgglomerativeClustering(n_clusters=optimal_n_clusters, metric="precomputed", linkage="average")
+    cluster_labels = clusterer.fit_predict(distance_matrix)
+
+    # Compute centers (medoids - closest point to cluster mean)
+    centers = []
+    for i in range(optimal_n_clusters):
+        cluster_indices = np.where(cluster_labels == i)[0]
+        cluster_distances = distance_matrix[np.ix_(cluster_indices, cluster_indices)]
+        medoid_idx = cluster_indices[cluster_distances.sum(axis=1).argmin()]
+        centers.append(data[medoid_idx][0])  # Get the individual vector
+
+    return cluster_labels, np.array(centers)
