@@ -122,7 +122,9 @@ class SDPipelineManager:
         """
 
     def text_embeddings(self, prompt):
-        BATCH_SIZE = len(PROMPTS)
+        if isinstance(prompt, str):
+            prompt = [prompt]  # prompt must be a list
+        BATCH_SIZE = len(prompt)
         # Generate embeddings for the prompt
         text_input = self.tokenizer(
             prompt,

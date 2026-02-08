@@ -1,4 +1,4 @@
-# %%writefile main_single_ind.py
+# %%writefile main_time_tracking.py
 import torch
 import random
 import re
@@ -12,9 +12,12 @@ from diffusion import pipeline_manager
 from data_visualization import export_as_gif, plot_confidence, plot_distance
 from config import *
 import utils
+import time
+
+SEED = 7
 
 
-def mutate_rand_digit(m1: "DigitMutator", m2: "DigitMutator", images1, images2):
+def mutate_rand_digit(m1: "DigitMutator", m2: "DigitMutator", images1, images2, generator=None):
     # Scegli membro casuale
     if random.getrandbits(1):
         selected_m = m1
@@ -25,7 +28,8 @@ def mutate_rand_digit(m1: "DigitMutator", m2: "DigitMutator", images1, images2):
         other_m = m1
         is1 = False
 
-    selected_m.denoise_and_decode(isMutating=True)
+    selected_m.initial_mutation(generator)
+    selected_m.generate(generator=generator)
 
     if is1:
         images1.append(selected_m.digit.image_tensor)
@@ -46,17 +50,28 @@ def mutate_rand_digit(m1: "DigitMutator", m2: "DigitMutator", images1, images2):
 
 
 def main(prompt, expected_label, max_steps=NGEN):
+    # Set all random seeds
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed_all(SEED)
+    random.seed(SEED)
+
     # Initialize pipeline if not already done
     if not pipeline_manager._initialized:
-        pipeline_manager.initialize(mode="custom")
+        pipeline_manager.initialize(mode="standard")
 
-    assert pipeline_manager._mode == "custom", "Pipeline must be in custom mode"
+    assert pipeline_manager._mode == "standard", "Pipeline must be in standard mode"
+
+    # Create generator for torch operations
+    generator = torch.Generator(device=DEVICE).manual_seed(SEED)
 
     # Force finding a valid initial latent
     while True:
         # Starting from a random latent noise vector
         initial_latent = torch.randn(
-            (1, pipeline_manager.unet.config.in_channels, HEIGHT // 8, WIDTH // 8), device=DEVICE, dtype=DTYPE
+            (1, pipeline_manager.pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8),
+            device=DEVICE,
+            dtype=DTYPE,
+            generator=generator,
         )
 
         digit1 = MnistMember(initial_latent, expected_label)
@@ -64,7 +79,7 @@ def main(prompt, expected_label, max_steps=NGEN):
         # Initial generation and validation
         # Higher guidance_scale to assure the prompt is followed correctly
         mutator1 = DigitMutator(digit1, initial_latent)
-        mutator1.denoise_and_decode(isMutating=False, guidance_scale=3.5)
+        mutator1.generate(guidance_scale=3.5, generator=generator)
         prediction, confidence = Predictor.predict_single(digit1, expected_label)
 
         # Initial assignment
@@ -99,9 +114,14 @@ def main(prompt, expected_label, max_steps=NGEN):
     latent_cos_sims.append(0)
 
     # Iterative mutation process
+    iteration_times = []
     for step in range(1, max_steps + 1):
+        start_time = time.perf_counter()
+
         # Mutation
-        prediction, confidence, selected_digit, other_digit = mutate_rand_digit(mutator1, mutator2, images1, images2)
+        prediction, confidence, selected_digit, other_digit = mutate_rand_digit(
+            mutator1, mutator2, images1, images2, generator
+        )
 
         selected_digit.predicted_label = prediction
         selected_digit.confidence = confidence
@@ -116,6 +136,9 @@ def main(prompt, expected_label, max_steps=NGEN):
         euc_dists.append(euc_dist)
         img_euc_dist = utils.get_distance(selected_digit, other_digit, "image_euclidean")
         euc_img_dists.append(img_euc_dist)
+
+        elapsed = time.perf_counter() - start_time
+        iteration_times.append(elapsed)
         print(
             f"[{step:03d}] "
             f"pred={selected_digit.predicted_label} "
@@ -123,6 +146,7 @@ def main(prompt, expected_label, max_steps=NGEN):
             f"cos_sim={cos_sim:.3f} "
             f"euc_dist={euc_dist:.3f} "
             f"euc_img_dist={img_euc_dist:.3f}"
+            f"time={elapsed:.2f}s"
         )
 
         if not selected_digit.correctly_classified:
@@ -132,6 +156,12 @@ def main(prompt, expected_label, max_steps=NGEN):
                 f"exp={selected_digit.expected_label}"
             )
             break
+
+    # Timing stats
+    print(f"\nTiming stats:")
+    print(f"  Total time: {sum(iteration_times):.2f}s")
+    print(f"  Avg per iteration: {sum(iteration_times)/len(iteration_times):.2f}s")
+    print(f"  Min: {min(iteration_times):.2f}s, Max: {max(iteration_times):.2f}s")
 
     ind = Individual(digit1, digit2, prompt, None)  # Create final individual to see results
     ind.misstep = step
@@ -143,11 +173,14 @@ def main(prompt, expected_label, max_steps=NGEN):
     base_path = f"{Folder.DST}"
     export_as_gif(f"{base_path}/individual_{Folder.run_id}_1.gif", images1, rubber_band=True)
     export_as_gif(f"{base_path}/individual_{Folder.run_id}_2.gif", images2, rubber_band=True)
+    plot_confidence(digit1.confidence_history, f"{base_path}/confidence_{Folder.run_id}_1.png")
+    plot_confidence(digit2.confidence_history, f"{base_path}/confidence_{Folder.run_id}_2.png")
     plot_distance(euc_dists, f"{base_path}/euclidean_distance_{Folder.run_id}.png", "Euclidean distance")
     plot_distance(latent_cos_sims, f"{base_path}/cosine_similarity_{Folder.run_id}.png", "Cosine similarity")
     plot_distance(
         euc_img_dists, f"{base_path}/euclidean_image_distance_{Folder.run_id}.png", "Euclidean image distance"
     )
+    plot_distance(iteration_times, f"{base_path}/iteration_times_{Folder.run_id}.png", "Iteration Time (seconds)")
 
 
 if __name__ == "__main__":

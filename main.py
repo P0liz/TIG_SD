@@ -238,8 +238,8 @@ class GeneticAlgorithm:
                 member.correctly_classified = False
             print(f"exp: {member.expected_label} -> pred: {pred} (confidence: {conf:.3f})")
 
-            # If confidence diff is too low and the new confidence is higher then...
-            if abs(conf - member.confidence) <= CONF_CHANGE and conf >= member.confidence:
+            # If confidence diff is too low or the new confidence is higher then...
+            if abs(conf - member.confidence) <= CONF_CHANGE or conf >= member.confidence:
                 member.standing_steps += 1
             else:
                 member.standing_steps = 0

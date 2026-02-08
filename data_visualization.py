@@ -21,7 +21,7 @@ def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
         img_np = (img_np * 255).astype("uint8")
         pil_images.append(Image.fromarray(img_np, mode="L"))
 
-    if rubber_band:
+    if rubber_band and len(pil_images) > 2:
         pil_images += pil_images[2:-1][::-1]
 
     pil_images[0].save(

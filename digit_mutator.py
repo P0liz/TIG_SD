@@ -17,7 +17,7 @@ class DigitMutator:
         self.cached_latent = None
 
         if pipeline_manager._mode == "custom":
-            self.text_embeddings = pipeline_manager.text_embeddings(PROMPTS[self.digit.expected_label])
+            self.text_embeddings = pipeline_manager.text_embeddings([PROMPTS[self.digit.expected_label]])
             # First pass: denoise until mutation_step is reached, then cache it
             self.cache_denoising_steps()
 
@@ -63,12 +63,14 @@ class DigitMutator:
         # TODO: custom timesteps?
         scheduler.set_timesteps(self.inference_steps)
 
+        # Latent walk on cached vector
         if isMutating:
+            # Mutate the cached latent vector
             perturbation_size = mutation_manager.calculate_perturbation_size(self.digit.standing_steps)
             self.cached_latent = mutation_manager.mutate(self.cached_latent, perturbation_size)
             # Reset prediction status to trigger re-evaluation
             self.digit.reset()
-        latent = self.cached_latent
+        latent = self.cached_latent.clone()
         print(f"Latent stats - min: {latent.min():.2f}, max: {latent.max():.2f}, std: {latent.std():.2f}")
 
         # Only denoise from mutation_step onwards
@@ -87,11 +89,11 @@ class DigitMutator:
 
         return latent
 
-    def initial_mutation(self):
+    def initial_mutation(self, generator=None):
         perturbation_size = mutation_manager.calculate_perturbation_size(self.digit.standing_steps)
 
         # Latent mutation
-        mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size)
+        mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size, generator)
         print(
             f"Latent stats - min: {mutated_latent.min():.2f}, max: {mutated_latent.max():.2f}, std: {mutated_latent.std():.2f}"
         )
@@ -100,10 +102,10 @@ class DigitMutator:
         # Reset prediction status to trigger re-evaluation
         self.digit.reset()
 
-    def generate(self, guidance_scale=2.5):
+    def generate(self, guidance_scale=2.5, generator=None):
         assert pipeline_manager._mode == "standard", "generate() only works in standard mode"
         prompt = PROMPTS[self.digit.expected_label]
-        _, mutated_tensor, image = mutation_manager.generate(prompt, self.digit.latent, guidance_scale)
+        _, mutated_tensor, image = mutation_manager.generate(prompt, self.digit.latent, guidance_scale, generator)
 
         # Update state
         self.digit.image_tensor = mutated_tensor

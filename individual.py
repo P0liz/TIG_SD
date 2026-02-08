@@ -47,16 +47,16 @@ class Individual:
 
     def to_dict(self):
         return {
-            "id": self.id,
+            "id": str(self.id),
             "m1": {
-                "expected_label": self.m1.expected_label,
-                "predicted_label": self.m1.predicted_label,
-                "confidence": float(self.m1.confidence),
+                "expected_label": str(self.m1.expected_label),
+                "predicted_label": str(self.m1.predicted_label),
+                "confidence": str(self.m1.confidence),
             },
             "m2": {
-                "expected_label": self.m2.expected_label,
-                "predicted_label": self.m2.predicted_label,
-                "confidence": float(self.m2.confidence),
+                "expected_label": str(self.m2.expected_label),
+                "predicted_label": str(self.m2.predicted_label),
+                "confidence": str(self.m2.confidence),
             },
             "members_distance": str(self.members_distance),
             "members_img_euc_dist": str(self.members_img_euc_dist),

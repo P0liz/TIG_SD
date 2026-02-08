@@ -11,7 +11,7 @@ from diffusion import pipeline_manager
 from config import DEVICE, DELTA, STANDING_STEP_LIMIT
 
 
-def mutate(z_orig, perturbation_size):
+def mutate(z_orig, perturbation_size, generator=None):
     """
     Muta il latent code aggiungendo rumore gaussiano
 
@@ -22,7 +22,7 @@ def mutate(z_orig, perturbation_size):
     Returns:
         z_mut: torch.Tensor - latent mutato
     """
-    epsilon = torch.randn_like(z_orig, device=DEVICE)  # randn to have ε ~ N(0, I) noise
+    epsilon = torch.randn_like(z_orig, device=DEVICE, generator=generator)  # randn to have ε ~ N(0, I) noise
     z_mut = z_orig + perturbation_size * epsilon
     # z_mut = apply_mutation_op1(z_orig)
     return z_mut
@@ -56,7 +56,7 @@ def apply_mutation_op1(org_latent, device=DEVICE):
     return mutated_latent
 
 
-def generate(prompt, mutated_latent, guidance_scale=2.5):
+def generate(prompt, mutated_latent, guidance_scale=2.5, generator=None):
     """
     Genera un'immagine usando Stable Diffusion
 
@@ -76,6 +76,7 @@ def generate(prompt, mutated_latent, guidance_scale=2.5):
             guidance_scale=guidance_scale,
             num_inference_steps=pipeline_manager.num_inference_steps,
             latents=mutated_latent,
+            generator=generator,
         )["images"][0]
 
     # preprocess image to 28x28 grayscale tensor
