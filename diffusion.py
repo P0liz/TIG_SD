@@ -111,15 +111,19 @@ class SDPipelineManager:
 
         # TODO: Understand differences between schedulers
         # Load scheduler
+
         self.scheduler = DDIMScheduler.from_pretrained(
             MODEL_ID_PATH, subfolder="scheduler", rescale_betas_zero_snr=False
         )
+        """
         # TODO: test this
-        """
         self.scheduler = DPMSolverMultistepScheduler.from_pretrained(
-            MODEL_ID_PATH, subfolder="scheduler", algorithm_type="dpmsolver++", thresholding=True, timestep_spacing="linspace",
-        )
-        """
+            MODEL_ID_PATH,
+            subfolder="scheduler",
+            algorithm_type="dpmsolver++",
+            thresholding=True,
+            timestep_spacing="linspace",
+        )"""
 
     def text_embeddings(self, prompt):
         if isinstance(prompt, str):
