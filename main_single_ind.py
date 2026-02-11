@@ -84,7 +84,7 @@ def main(prompt, expected_label, max_steps=NGEN):
 
         # Initial generation and validation
         # Higher guidance_scale to assure the prompt is followed correctly
-        mutator1 = DigitMutator(digit1, initial_latent)
+        mutator1 = DigitMutator(digit1)
         if MODE == "custom":
             mutator1.denoise_and_decode(isMutating=False, guidance_scale=3.5, generator=generator)
         elif MODE == "standard":

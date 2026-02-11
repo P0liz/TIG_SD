@@ -7,7 +7,8 @@ class MnistMember:
     def __init__(self, latent, expected_label):
         self.image = None  # PIL Image in rgb
         self.image_tensor = None  # Torch Tensor [1, 1, 28, 28] in grayscale
-        self.latent = latent
+        self.og_latent = latent.clone()  # Original latent vector
+        self.latent = latent  # Latent vector modified through latent walk by mutation
         self.expected_label = expected_label
         self.predicted_label = None
         self.confidence = None

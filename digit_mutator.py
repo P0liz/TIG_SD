@@ -9,9 +9,9 @@ from diffusion import pipeline_manager
 
 class DigitMutator:
 
-    def __init__(self, digit, initial_latent, num_inference_steps=15, mutation_step=4):
+    def __init__(self, digit, num_inference_steps=15, mutation_step=4):
         self.digit: "MnistMember" = digit
-        self.initial_latent = initial_latent
+        self.initial_latent = digit.og_latent
         self.inference_steps = num_inference_steps  # total numebr of steps
         self.mutation_step = mutation_step  # Step to cache
         self.cached_latent = None
@@ -51,7 +51,7 @@ class DigitMutator:
     def clone(self):
         """Clone the mutator with a new digit instance but shared cache"""
         cloned_digit = self.digit.clone()
-        cloned_mutator = DigitMutator(cloned_digit, self.initial_latent, self.inference_steps, self.mutation_step)
+        cloned_mutator = DigitMutator(cloned_digit, self.inference_steps, self.mutation_step)
 
         # Shared cache between original and clone
         if pipeline_manager._mode == "custom":

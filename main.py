@@ -50,9 +50,11 @@ class GeneticAlgorithm:
         """
         for i in range(max_attempts):
             # Generate random latent at every attempt (sometimes too much noise)
-            latent = torch.randn((1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8), device=DEVICE, dtype=DTYPE)
+            og_latent = torch.randn(
+                (1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8), device=DEVICE, dtype=DTYPE
+            )
             # Generate member and classify it
-            member = MnistMember(latent, expected_label)
+            member = MnistMember(og_latent, expected_label)
             DigitMutator(member).generate(prompt, guidance_scale=guidance_scale)
             prediction, confidence = Predictor.predict_single(member, expected_label)
 

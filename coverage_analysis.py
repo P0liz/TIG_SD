@@ -216,6 +216,7 @@ if __name__ == "__main__":
 
     print(f"\nResults saved to {OUTPUT_FOLDER}/")
 
+
 # TODO: test clustering with distance between individuals
 # and review the code below
 from sklearn.cluster import AgglomerativeClustering

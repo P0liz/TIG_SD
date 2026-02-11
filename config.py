@@ -3,7 +3,6 @@ import torch
 
 # Dev testing
 TRYNEW = True
-MUTATION_TYPE = "single_random"  # Or "single_conf" # Or 'dual'
 DJ_DEBUG = True  # If True, creates detailed debug reports
 SHORT_GEN = True
 
