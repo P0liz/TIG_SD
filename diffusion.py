@@ -8,9 +8,8 @@ from diffusers.schedulers import DDIMScheduler
 
 # custom
 from transformers import CLIPTextModel, CLIPTokenizer
-from diffusers import AutoencoderKL, UNet2DConditionModel, DPMSolverMultistepScheduler
+from diffusers import AutoencoderKL, UNet2DConditionModel
 from diffusers.loaders import LoraLoaderMixin
-from tqdm.auto import tqdm
 from PIL import Image
 
 
@@ -28,7 +27,7 @@ class SDPipelineManager:
             cls._instance = super(SDPipelineManager, cls).__new__(cls)
         return cls._instance
 
-    def initialize(self, mode="custom", num_inference_steps=15):
+    def initialize(self, mode="standard", num_inference_steps=15):
         """
         Initialize pipeline
         Args:
@@ -71,7 +70,7 @@ class SDPipelineManager:
         self.pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
 
         # Configure scheduler
-        self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config, rescale_betas_zero_snr=False)
+        self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config, rescale_betas_zero_snr=True)
 
     # ------------------------------------------------------
     #   CUSTOM IMPLEMENTATION
@@ -109,21 +108,24 @@ class SDPipelineManager:
             state_dict=state_dict, network_alphas=network_alphas, text_encoder=self.text_encoder
         )
 
-        # TODO: Understand differences between schedulers
         # Load scheduler
-
         self.scheduler = DDIMScheduler.from_pretrained(
-            MODEL_ID_PATH, subfolder="scheduler", rescale_betas_zero_snr=False
+            MODEL_ID_PATH, subfolder="scheduler", rescale_betas_zero_snr=False, timestep_spacing="leading"
+        )
+        # Possible alternative schedulers (while testing these gave less noisy images)
+        """
+        self.scheduler = EulerAncestralDiscreteScheduler.from_pretrained(
+            MODEL_ID_PATH, 
+            subfolder="scheduler", 
+            timestep_spacing="leading" 
+        )
+        
+        self.scheduler = EulerDiscreteScheduler.from_pretrained(
+            MODEL_ID_PATH, 
+            subfolder="scheduler",
+            timestep_spacing="leading" 
         )
         """
-        # TODO: test this
-        self.scheduler = DPMSolverMultistepScheduler.from_pretrained(
-            MODEL_ID_PATH,
-            subfolder="scheduler",
-            algorithm_type="dpmsolver++",
-            thresholding=True,
-            timestep_spacing="linspace",
-        )"""
 
     def text_embeddings(self, prompt):
         if isinstance(prompt, str):

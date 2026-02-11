@@ -12,11 +12,12 @@ from timer import Timer
 import archive_manager
 import utils
 from individual import Individual
-from diffusion import get_pipeline
+from diffusion import pipeline_manager
 from config import *
 
-
-pipe = get_pipeline()
+# Config SD Pipeline
+pipeline_manager.initialize("standard")
+pipe = pipeline_manager.pipe
 
 # DEAP framework setup.
 # Maximize aggregate_ff, minimize misclass

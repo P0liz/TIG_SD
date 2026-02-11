@@ -10,6 +10,10 @@ from torchvision import transforms
 from diffusion import pipeline_manager
 from config import DEVICE, DELTA, STANDING_STEP_LIMIT
 
+# Local config
+CLAMP_MIN = -5.41362476348877
+CLAMP_MAX = 5.43081117630005
+
 
 def mutate(z_orig, perturbation_size, generator=None):
     """
@@ -26,7 +30,7 @@ def mutate(z_orig, perturbation_size, generator=None):
         z_orig.shape, device=z_orig.device, dtype=z_orig.dtype, generator=generator
     )  # randn to have ε ~ N(0, I) noise
     z_mut = z_orig + perturbation_size * epsilon
-    # z_mut = apply_mutation_op1(z_orig)
+    z_mut = torch.clamp(z_mut, min=CLAMP_MIN, max=CLAMP_MAX)
     return z_mut
 
 

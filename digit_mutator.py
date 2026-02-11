@@ -93,7 +93,6 @@ class DigitMutator:
         return latent
 
     def initial_mutation(self, generator=None):
-        assert pipeline_manager._mode == "standard", "generate() only works in standard mode"
         perturbation_size = mutation_manager.calculate_perturbation_size(self.digit.standing_steps)
 
         # Latent mutation

@@ -10,13 +10,13 @@ from predictor import Predictor
 from digit_mutator import DigitMutator
 from mnist_member import MnistMember
 from diffusion import pipeline_manager
-from data_visualization import export_as_gif, plot_confidence, plot_distance
+from data_visualization import export_as_gif, plot_distance
 from config import *
 import utils
 
 # Local configuration
 MODE = "custom"  # Or standard
-SEED = 7
+SEED = random.randint(0, 2**32 - 1)
 
 
 def mutate_rand_digit(m1: "DigitMutator", m2: "DigitMutator", images1, images2, generator=None):
@@ -73,7 +73,9 @@ def main(prompt, expected_label, max_steps=NGEN):
         raise ValueError("Unknown mode")
 
     # Force finding a valid initial latent
+    tries = 0
     while True:
+        generator = torch.Generator(device=DEVICE).manual_seed(tries)
         # Starting from a random latent noise vector
         initial_latent = torch.randn(
             (1, unet_channels, HEIGHT // 8, WIDTH // 8), device=DEVICE, dtype=DTYPE, generator=generator
@@ -104,14 +106,15 @@ def main(prompt, expected_label, max_steps=NGEN):
             print(prompt, " - exp: ", expected_label)
             print(f"pred={digit1.predicted_label} " f"exp={digit1.expected_label}")
             print("Initial latent does not satisfy the label")
+            tries += 1
         else:
             break
-
-    print(f"[000] " f"exp={digit1.expected_label} " f"conf={digit1.confidence:.3f}")
 
     # second member of an Individual
     mutator2 = mutator1.clone()
     digit2 = mutator2.digit
+
+    print(f"[000] " f"exp={digit1.expected_label} " f"conf={digit1.confidence:.3f}")
 
     images1 = [digit1.image_tensor]
     images2 = [digit2.image_tensor]
