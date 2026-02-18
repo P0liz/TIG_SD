@@ -1,20 +1,20 @@
 # %%writefile config.py
 import torch
+from pathlib import Path
 
 # Dev testing
 TRYNEW = True
 DJ_DEBUG = True  # If True, creates detailed debug reports
-SHORT_GEN = True
+SHORT_GEN = False
 
 # Popolazione e generazioni
 if SHORT_GEN:
     POPSIZE = 12  # Must be divisible by 4
     NGEN = 50  # Number of generations
-    RESEED_INTERVAL = 5
 else:
     POPSIZE = 20
     NGEN = 100
-    RESEED_INTERVAL = 7
+RESEED_INTERVAL = 5
 INITIALPOP = "sequence"  # Or random"
 STEPSIZE = 10
 RESEEDUPPERBOUND = POPSIZE // 6  # Max number of reseed individuals
@@ -23,8 +23,8 @@ RESEEDUPPERBOUND = POPSIZE // 6  # Max number of reseed individuals
 ARCHIVE_TYPE = "bucket"  # Or "size" # Or "dist"
 REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
-TARGET_SIZE = (3 * POPSIZE) // 4  # Ideal number of archived individuals
-MAX_BUCKET_SIZE = 2
+TARGET_SIZE = 30  # Ideal number of archived individuals
+MAX_BUCKET_SIZE = 3
 # Minimum distance between two individuals to be considered different enough (the higher the less inds archived)
 # ATTENTION: this changes with the chosen metric
 ARCHIVE_THRESHOLD = 20  # img_euc: 8 # lat_cos: 0.5 # lat_euc: 20
@@ -77,3 +77,10 @@ PROMPTS = [
     "A photo of Eight8 Number8",
     "A photo of Nine9 Number9",
 ]
+
+# Diversity analysis
+ANALYSIS_CONFIG = "single_run"  # Or "archives"
+DIVERSITY_OUTPUT_FOLDER = "diversity_analysis_results"
+Path(DIVERSITY_OUTPUT_FOLDER).mkdir(exist_ok=True)
+FOCUS_NAME = "focus"
+OTHERS_NAME = "others"

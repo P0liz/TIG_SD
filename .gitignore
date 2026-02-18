@@ -209,3 +209,4 @@ __marimo__/
 # Custom additions
 runs/
 __pycache__
+diversity_analysis_results/

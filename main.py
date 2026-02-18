@@ -34,7 +34,7 @@ class GeneticAlgorithm:
     # Generation
     # ========================================================================
 
-    def generate_member(self, prompt, expected_label, guidance_scale=3.5, max_attempts=10):
+    def generate_member(self, expected_label, guidance_scale=3.5, max_attempts=10):
         """
         Generate a member with Stable Diffusion and Validate it if possible
         Starting with higher guidance_scale to get more realistic outputs
@@ -55,7 +55,7 @@ class GeneticAlgorithm:
             )
             # Generate member and classify it
             member = MnistMember(og_latent, expected_label)
-            DigitMutator(member).generate(prompt, guidance_scale=guidance_scale)
+            DigitMutator(member).generate(guidance_scale=guidance_scale)
             prediction, confidence = Predictor.predict_single(member, expected_label)
 
             # Validation
@@ -88,10 +88,10 @@ class GeneticAlgorithm:
         prompt = PROMPTS[label]
 
         # Generate members
-        m1 = self.generate_member(prompt, label)
+        m1 = self.generate_member(label)
         if m1 is None:
             # Riprova con guidance più alta
-            m1 = self.generate_member(prompt, label, guidance_scale=4.5)
+            m1 = self.generate_member(label, guidance_scale=4.5)
             if m1 is None:
                 raise ValueError(f"Cannot create individual for label {label}")
 
@@ -158,10 +158,9 @@ class GeneticAlgorithm:
             other_member = individual.m1
 
         # Mutate
-        prompt = PROMPTS[member_to_mutate.expected_label]
         mutator = DigitMutator(member_to_mutate)
         mutator.initial_mutation()  # Mutate latent
-        mutator.generate(prompt)  # Generate new image
+        mutator.generate()  # Generate new image
         individual.reset()  # reset fitness-related fields
 
         # Update distances
@@ -292,8 +291,6 @@ class GeneticAlgorithm:
         new_ind.members_latent_cos_sims = list(individual.members_latent_cos_sims)
         return new_ind
 
-    # TODO: test different strategy >> prompte prompts and latents that are already in the archive
-    # which means less diversity but higher chance of acceptance
     def reseed_population(self, population, n_reseed):
         """
         Reseed n_reseed individuals in the population to promote diversity
