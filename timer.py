@@ -5,6 +5,9 @@ from config import RUNTIME
 class Timer:
     start = datetime.now()
 
+    def initialize():
+        Timer.start = datetime.now()
+
     @staticmethod
     def get_time():
         return datetime.now()

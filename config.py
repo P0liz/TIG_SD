@@ -25,9 +25,10 @@ REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 TARGET_SIZE = 30  # Ideal number of archived individuals
 MAX_BUCKET_SIZE = 3
+BUCKET_CONFIG = "size"  # Or "dist"
 # Minimum distance between two individuals to be considered different enough (the higher the less inds archived)
 # ATTENTION: this changes with the chosen metric
-ARCHIVE_THRESHOLD = 20  # img_euc: 8 # lat_cos: 0.5 # lat_euc: 20
+DIST_THRESHOLD = 20  # img_euc: 8 # lat_cos: 0.5 # lat_euc: 20
 
 # Timer
 RUNTIME = 3600

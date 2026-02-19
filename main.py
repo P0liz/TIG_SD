@@ -8,7 +8,6 @@ from deap.tools.emo import selNSGA2
 from mnist_member import MnistMember
 from digit_mutator import DigitMutator
 from predictor import Predictor
-from timer import Timer
 import archive_manager
 import utils
 from individual import Individual
@@ -167,45 +166,6 @@ class GeneticAlgorithm:
         individual.members_distance = utils.get_distance(member_to_mutate, other_member, "latent_euclidean")
         individual.members_img_euc_dist = utils.get_distance(member_to_mutate, other_member, "image_euclidean")
         individual.members_latent_cos_sim = utils.get_distance(member_to_mutate, other_member, "latent_cosine")
-
-    # ========================================================================
-    # Selection
-    # ========================================================================
-    # TODO: probably does not work >>> not enough inds of a label to reach archived status
-    # Should try with a bigger population
-    def select_non_dominant_population(self, individuals: list["Individual"]):
-        MAX_IND_PER_LABEL = POPSIZE // 3  # Max one third of the population
-        kept = []
-        overflown = []
-        sorted_pops = selNSGA2(individuals, len(individuals))
-
-        # Selecting only a limited number of individuals per label
-        # selNSGA2 orders by best fronts so the first elements are the best
-        label_count = [0] * len(PROMPTS)
-        for ind in sorted_pops:
-            label = ind.m1.expected_label
-            label_count[label] += 1
-            if label_count[label] <= MAX_IND_PER_LABEL:
-                kept.append(ind)
-            else:
-                overflown.append(ind)
-
-        # Assuring the population to return matches POPSIZE
-        if len(kept) < POPSIZE:
-            n_missing = POPSIZE - len(kept)
-            if len(overflown) >= n_missing:
-                # Fill with individuals from overflown
-                kept.extend(overflown[:n_missing])
-            else:
-                # Not enough overflown, fill with new individuals
-                n_missing = POPSIZE - len(kept)
-                for i in range(n_missing):
-                    new_ind = self.create_individual()
-                    kept.append(new_ind)
-        elif len(kept) > POPSIZE:
-            # Trim to exactly POPSIZE (keep best ones, already sorted)
-            kept = kept[:POPSIZE]
-        return kept
 
     # ========================================================================
     # Evaluation
@@ -478,10 +438,12 @@ class GeneticAlgorithm:
 
 if __name__ == "__main__":
     from folder import Folder
+    from timer import Timer
     from utils import print_archive_experiment
     import config
 
     Folder.initialize(method=config.ARCHIVE_TYPE)
+    Timer.initialize()
 
     ga = GeneticAlgorithm()
     population, archive = ga.run()

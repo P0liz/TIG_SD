@@ -210,3 +210,5 @@ __marimo__/
 runs/
 __pycache__
 diversity_analysis_results/
+runs_*/
+diversity_analysis_results_*/

@@ -8,10 +8,14 @@ from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH
 
 class Predictor:
 
-    # Load the pre-trained model.
+    # MNIST classifier
+    # Load the model
     classifier = MnistClassifier(img_size=IMG_SIZE).to(DEVICE)
-    # Load pretrained model
     classifier.load_state_dict(torch.load(CLASSIFIER_WEIGHTS_PATH, map_location=DEVICE))
+
+    # VGG19 pretrained on ImageNet
+    # classifier = torch.hub.load("pytorch/vision:v0.10.0", "vgg19_bn", pretrained=True).to(DEVICE)
+
     classifier.eval()
     print("Loaded classifier")
 

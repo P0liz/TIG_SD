@@ -34,7 +34,7 @@ class Archive:
 
     # Creating a bucket for a specific label
     # Same labels compete with each other
-    def update_bucket_archive(self, ind):
+    def update_bucket_archive(self, ind: "Individual"):
         if ind not in self.archive:
             bucket = [arc_ind for arc_ind in self.archive if arc_ind.m1.expected_label == ind.m1.expected_label]
             if len(bucket) == 0:
@@ -56,43 +56,44 @@ class Archive:
                 if d_min > 0.0:
                     # reach max bucket size
                     if len(bucket) < MAX_BUCKET_SIZE:
-                        """EASY ENTER
-                        self.archive.append(ind)
-                        self.archived_labels.add(ind.m1.expected_label)
-                        # print(f"SPACE LEFT IN THE BUCKET FOR LABEL {ind.m1.expected_label}")
-                        self.print_helper(ind, "newly added")
-                        """
-                        # HARD ENTER
-                        print(f"New min distance between individuals: {d_min}")
-                        # Decide whether to add the candidate to the archive
-                        # Verify whether the candidate is close to the existing individual of the archive
-                        # Note: 'close' is defined according to a user-defined threshold
-                        if d_min <= ARCHIVE_THRESHOLD:
-                            # The candidate replaces the closest archive individual if its members' distance is better
-                            print("Candidate is close to an existing archive individual, updating archive...")
-                            print(
-                                f"Comparing distances: {getattr(ind, self.distance_input)} vs {getattr(closest, self.distance_input)}"
-                            )
-                            members_dist_ind = getattr(ind, self.distance_input)
-                            members_dist_archived_ind = getattr(closest, self.distance_input)
-                            if members_dist_ind <= members_dist_archived_ind:
-                                self.archive.remove(closest)
-                                self.print_helper(closest, "removed")
-                                self.archived_labels.remove(closest.m1.expected_label)
-                                self.archive.append(ind)
-                                self.print_helper(ind, "added")
-                                self.archived_labels.add(ind.m1.expected_label)
-                            else:
-                                self.print_helper(ind, "not added")
-                        else:
-                            # Add the candidate to the archive if it is distant from all the other archive individuals
-                            self.print_helper(ind, "newly added")
+                        if BUCKET_CONFIG == "size":
+                            # Fill bucket until max bucket size is reached
                             self.archive.append(ind)
                             self.archived_labels.add(ind.m1.expected_label)
+                            self.print_helper(ind, "newly added")
+                        elif BUCKET_CONFIG == "dist":
+                            # HARD ENTER
+                            print(f"New min distance between individuals: {d_min}")
+                            # Decide whether to add the candidate to the archive
+                            # Verify whether the candidate is close to the existing individual of the archive
+                            # Note: 'close' is defined according to a user-defined threshold
+                            if d_min <= DIST_THRESHOLD:
+                                # The candidate replaces the closest archive individual if its members' distance is better
+                                print("Candidate is close to an existing archive individual, updating archive...")
+                                print(
+                                    f"Comparing distances: {getattr(ind, self.distance_input)} vs {getattr(closest, self.distance_input)}"
+                                )
+                                members_dist_ind = getattr(ind, self.distance_input)
+                                members_dist_archived_ind = getattr(closest, self.distance_input)
+                                if members_dist_ind <= members_dist_archived_ind:
+                                    self.archive.remove(closest)
+                                    self.print_helper(closest, "removed")
+                                    self.archived_labels.remove(closest.m1.expected_label)
+                                    self.archive.append(ind)
+                                    self.print_helper(ind, "added")
+                                    self.archived_labels.add(ind.m1.expected_label)
+                                else:
+                                    self.print_helper(ind, "not added")
+                            else:
+                                # Add the candidate to the archive if it is distant from all the other archive individuals
+                                self.print_helper(ind, "newly added")
+                                self.archive.append(ind)
+                                self.archived_labels.add(ind.m1.expected_label)
+                        else:
+                            raise ValueError(f"Invalid bucket configuration: {BUCKET_CONFIG}")
                     # when bucket is full >>> local competition between new and worst
                     elif len(bucket) == MAX_BUCKET_SIZE:
                         bucket.sort(key=lambda x: getattr(x, self.distance_input))
-                        # print(f"MAX BUCKET SIZE FOR LABEL {ind.m1.expected_label}")
                         tshd = bucket[-1]  # worst ind
                         if getattr(ind, self.distance_input) < getattr(tshd, self.distance_input):
                             self.archive.remove(tshd)
@@ -184,7 +185,7 @@ class Archive:
                 # Decide whether to add the candidate to the archive
                 # Verify whether the candidate is close to the existing individual of the archive
                 # Note: 'close' is defined according to a user-defined threshold
-                if d_min <= ARCHIVE_THRESHOLD:
+                if d_min <= DIST_THRESHOLD:
                     # The candidate replaces the closest archive individual if its members' distance is better
                     print("Candidate is close to an existing archive individual, updating archive...")
                     print(
@@ -279,9 +280,7 @@ class Archive:
             "popsize": str(POPSIZE),
             "budget": str(budget),
             "budget_type": str(STOP_CONDITION),
-            "archive_type": str(ARCHIVE_TYPE),
             "distance_metric": str(DISTANCE_METRIC),
-            "archive_tshd": str(ARCHIVE_THRESHOLD),
             "reseed_interval": str(RESEED_INTERVAL),
             "reseed_upperbound": str(RESEEDUPPERBOUND),
             "classifier": str(CLASSIFIER_WEIGHTS_PATH),
@@ -290,7 +289,16 @@ class Archive:
             "K_SD": str(K_SD),
             "perturbation_size": str(DELTA),
             "standing_steps_limit": str(STANDING_STEP_LIMIT),
+            "archive_type": str(ARCHIVE_TYPE),
         }
+
+        if ARCHIVE_TYPE == "bucket":
+            config["bucket_config"] = str(BUCKET_CONFIG)
+            config["max_bucket_size"] = str(MAX_BUCKET_SIZE)
+        elif ARCHIVE_TYPE == "size":
+            config["target_size"] = str(TARGET_SIZE)
+        elif ARCHIVE_TYPE == "dist":
+            config["archive_tshd"] = str(DIST_THRESHOLD)
 
         dst = join(Folder.DST, "config.json")
 
@@ -307,7 +315,6 @@ class Archive:
                 [
                     Folder.run_id,
                     str(generation),
-                    str(elapsed_time),
                     str(n),
                     str(len(labels)),
                     str(len(self.archived_labels)),
@@ -322,6 +329,7 @@ class Archive:
                     # str(in_radius),
                     str(out_diameter),
                     str(in_diameter),
+                    str(elapsed_time),
                 ]
             )
         # Save logbook as CSV table
@@ -347,11 +355,13 @@ class Archive:
                             "avg_misclass",
                             "std_aggregate_ff",
                             "std_misclass",
+                            "elapsed_time",
                         ]
                     )
 
                 # Write only the last record (current generation)
                 record = logbook[-1]
+                _, elapsed_time = Timer.get_timestamps()
                 writer.writerow(
                     [
                         record["gen"],
@@ -366,6 +376,7 @@ class Archive:
                         record["avg"][1],
                         record["std"][0],
                         record["std"][1],
+                        str(elapsed_time),
                     ]
                 )
         # plot label distribution
