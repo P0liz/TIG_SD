@@ -5,7 +5,7 @@ from pathlib import Path
 # Dev testing
 TRYNEW = True
 DJ_DEBUG = True  # If True, creates detailed debug reports
-SHORT_GEN = False
+SHORT_GEN = True
 
 # Popolazione e generazioni
 if SHORT_GEN:
@@ -43,8 +43,8 @@ IMG_SIZE = 28
 
 # Stable Diffusion
 MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
-# LORA_PATH = "./SD_weights"
-LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
+LORA_PATH = "./SD_weights"
+# LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
 LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
 DELTA = 0.025  # affects perturbation size for mutation
 STANDING_STEP_LIMIT = 2

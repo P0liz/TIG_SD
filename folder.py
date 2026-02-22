@@ -2,7 +2,7 @@ from timer import Timer
 from datetime import datetime
 from os.path import exists, join
 from os import makedirs
-import config
+from config import ARCHIVE_TYPE, BUCKET_CONFIG
 
 
 class Folder:
@@ -13,13 +13,15 @@ class Folder:
     method = None
 
     @classmethod
-    def initialize(cls, custom_run_id=None, method=config.ARCHIVE_TYPE):
+    def initialize(cls, custom_run_id=None, method=ARCHIVE_TYPE):
         Timer.start = datetime.now()
         cls.run_id = custom_run_id or str(Timer.start.strftime("%s"))
         cls.method = method
+        if method == "bucket":
+            cls.method = f"bucket_{BUCKET_CONFIG}"
 
         # Create structure: runs/{method}/run_{id}/
-        cls.DST = join("runs", f"archive_{method}", f"run_{cls.run_id}")
+        cls.DST = join("runs", f"archive_{cls.method}", f"run_{cls.run_id}")
         if not exists(cls.DST):
             makedirs(cls.DST)
 

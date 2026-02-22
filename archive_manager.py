@@ -219,7 +219,6 @@ class Archive:
                     [
                         "run",
                         "iteration",
-                        "timestamp",
                         "archive_len",
                         "total_seeds",
                         "covered_seeds",
@@ -232,6 +231,7 @@ class Archive:
                         # "radius_ref_in",
                         "diameter_out",
                         "diameter_in",
+                        "elapsed_time",
                     ]
                 )
         solution = [ind for ind in self.archive]

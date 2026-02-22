@@ -442,12 +442,13 @@ if __name__ == "__main__":
     from utils import print_archive_experiment
     import config
 
-    Folder.initialize(method=config.ARCHIVE_TYPE)
-    Timer.initialize()
+    for i in range(0, 5):
+        Folder.initialize(method=config.ARCHIVE_TYPE)
+        Timer.initialize()
 
-    ga = GeneticAlgorithm()
-    population, archive = ga.run()
+        ga = GeneticAlgorithm()
+        population, archive = ga.run()
 
-    print("\n### FINAL ARCHIVE")
-    print_archive_experiment(archive.get_archive())
-    print("GAME OVER")
+        print("\n### FINAL ARCHIVE")
+        print_archive_experiment(archive.get_archive())
+        print("GAME OVER")
