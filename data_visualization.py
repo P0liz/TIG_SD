@@ -3,7 +3,8 @@ from PIL import Image
 import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-from matplotlib_venn import venn3, venn3_circles
+
+from upsetplot import UpSet, from_memberships
 from config import PROMPTS, ANALYSIS_CONFIG, DIVERSITY_OUTPUT_FOLDER, FOCUS_NAME, OTHERS_NAME
 
 
@@ -131,7 +132,12 @@ def plot_diversity_with_expected_labels(
     if ANALYSIS_CONFIG == "single_run":
         method_markers = {FOCUS_NAME: "v", OTHERS_NAME: "o"}
     elif ANALYSIS_CONFIG == "archives":
-        method_markers = {"archive_size": "s", "archive_dist": "d", "archive_bucket": "^"}
+        method_markers = {
+            "archive_size": "s",
+            "archive_dist": "d",
+            "archive_bucket_size": "^",
+            "archive_bucket_dist": "o",
+        }
     else:
         raise ValueError(f"Unknown ANALYSIS_CONFIG: {ANALYSIS_CONFIG}")
 
@@ -217,9 +223,14 @@ def plot_diversity_with_expected_labels(
 
 def plot_coverage_venn(all_data, cluster_labels, method_names):
     """
-    Crea un diagramma di Venn per mostrare overlap di coverage tra archivi.
+    Crea un UpSet plot per mostrare overlap di coverage tra 4 archivi.
     """
-    assert ANALYSIS_CONFIG == "archives", "Venn diagram is only for archives comparison"
+    assert ANALYSIS_CONFIG == "archives", "UpSet plot is only for archives comparison"
+
+    if len(method_names) != 4:
+        print(f"This function requires exactly 4 methods, got {len(method_names)}")
+        return None
+
     num_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
     labels_method = [sample[1] for sample in all_data]
 
@@ -229,109 +240,59 @@ def plot_coverage_venn(all_data, cluster_labels, method_names):
         method_indices = [i for i, label in enumerate(labels_method) if label == method]
         method_clusters[method] = set(cluster_labels[i] for i in method_indices if cluster_labels[i] != -1)
 
-    # Prepara i set per venn (assumendo 3 metodi)
-    if len(method_names) != 3:
-        print(f"Venn diagram requires exactly 3 methods, got {len(method_names)}")
-        return None
+    # Per ogni cluster, determina a quali metodi appartiene
+    all_covered_clusters = set.union(*method_clusters.values())
+    memberships = []
+    for cluster in all_covered_clusters:
+        membership = [m for m in method_names if cluster in method_clusters[m]]
+        memberships.append(membership)
 
-    set_A = method_clusters[method_names[0]]
-    set_B = method_clusters[method_names[1]]
-    set_C = method_clusters[method_names[2]]
+    # Costruisci UpSet data
+    upset_data = from_memberships(memberships)
 
-    # Calcola intersezioni
-    only_A = set_A - set_B - set_C
-    only_B = set_B - set_A - set_C
-    only_C = set_C - set_A - set_B
-    AB_only = (set_A & set_B) - set_C
-    AC_only = (set_A & set_C) - set_B
-    BC_only = (set_B & set_C) - set_A
-    ABC = set_A & set_B & set_C
+    # Plot
+    fig = plt.figure(figsize=(16, 8))
+    upset = UpSet(upset_data, subset_size="count", show_counts=True, sort_by="cardinality")
+    upset.plot(fig)
 
-    # Crea il diagramma
-    plt.figure(figsize=(14, 10))
+    # Statistiche individuali
+    stats_lines = ["INDIVIDUAL COVERAGE", "=" * 35]
+    for method in method_names:
+        n = len(method_clusters[method])
+        stats_lines.append(f"  {method}: {n} clusters ({n/num_clusters*100:.1f}%)")
 
-    # Venn diagram
-    venn = venn3(
-        [set_A, set_B, set_C],
-        set_labels=(
-            f"{method_names[0]}\n({len(set_A)} clusters, {len(set_A)/num_clusters*100:.1f}%)",
-            f"{method_names[1]}\n({len(set_B)} clusters, {len(set_B)/num_clusters*100:.1f}%)",
-            f"{method_names[2]}\n({len(set_C)} clusters, {len(set_C)/num_clusters*100:.1f}%)",
-        ),
-    )
+    # Intersezioni notevoli
+    sets = [method_clusters[m] for m in method_names]
+    union_all = set.union(*sets)
+    intersect_all = set.intersection(*sets)
+    stats_lines += [
+        "",
+        "INTERSECTIONS",
+        "=" * 35,
+        f"  Union (≥1 method):  {len(union_all)} ({len(union_all)/num_clusters*100:.1f}%)",
+        f"  Common to all 4:    {len(intersect_all)} ({len(intersect_all)/num_clusters*100:.1f}%)",
+    ]
 
-    # Aggiungi i cerchi
-    venn3_circles([set_A, set_B, set_C], linewidth=2)
+    # Unici per metodo
+    stats_lines += ["", "UNIQUE CLUSTERS", "=" * 35]
+    for i, method in enumerate(method_names):
+        others = set.union(*[method_clusters[m] for m in method_names if m != method])
+        unique = method_clusters[method] - others
+        stats_lines.append(f"  Unique to {method}: {len(unique)} ({len(unique)/num_clusters*100:.1f}%)")
 
-    # Personalizza colori correttamente
-    colors = {
-        "100": "#ff9999",  # Solo A - rosso chiaro
-        "010": "#66b3ff",  # Solo B - blu chiaro
-        "001": "#99ff99",  # Solo C - verde chiaro
-        "110": "#ffcc99",  # A e B - arancione chiaro
-        "101": "#ff99cc",  # A e C - rosa chiaro
-        "011": "#99ffcc",  # B e C - turchese chiaro
-        "111": "#ffff99",  # Tutti e tre - giallo chiaro
-    }
-
-    for patch_id, color in colors.items():
-        patch = venn.get_patch_by_id(patch_id)
-        if patch:
-            patch.set_color(color)
-            patch.set_alpha(0.5)
-            patch.set_edgecolor("black")
-            patch.set_linewidth(0.5)
-
-    # Aggiorna le etichette con conteggi e percentuali
-    label_data = {
-        "100": (only_A, f"{len(only_A)}\n({len(only_A)/num_clusters*100:.1f}%)"),
-        "010": (only_B, f"{len(only_B)}\n({len(only_B)/num_clusters*100:.1f}%)"),
-        "001": (only_C, f"{len(only_C)}\n({len(only_C)/num_clusters*100:.1f}%)"),
-        "110": (AB_only, f"{len(AB_only)}\n({len(AB_only)/num_clusters*100:.1f}%)"),
-        "101": (AC_only, f"{len(AC_only)}\n({len(AC_only)/num_clusters*100:.1f}%)"),
-        "011": (BC_only, f"{len(BC_only)}\n({len(BC_only)/num_clusters*100:.1f}%)"),
-        "111": (ABC, f"{len(ABC)}\n({len(ABC)/num_clusters*100:.1f}%)"),
-    }
-
-    for label_id, (cluster_set, text) in label_data.items():
-        label = venn.get_label_by_id(label_id)
-        if label:
-            label.set_text(text)
-            label.set_fontsize(11)
-            label.set_fontweight("bold")
-
-    plt.title(f"Archive Coverage Overlap\nTotal Clusters: {num_clusters}", fontsize=18, fontweight="bold", pad=20)
-
-    # Aggiungi statistiche testuali
-    overlap_count = len(AB_only) + len(AC_only) + len(BC_only) + len(ABC)
-
-    stats_text = (
-        f"COVERAGE STATISTICS\n"
-        f"{'='*40}\n\n"
-        f"Individual Coverage:\n"
-        f"  • {method_names[0]}: {len(set_A)} clusters ({len(set_A)/num_clusters*100:.1f}%)\n"
-        f"  • {method_names[1]}: {len(set_B)} clusters ({len(set_B)/num_clusters*100:.1f}%)\n"
-        f"  • {method_names[2]}: {len(set_C)} clusters ({len(set_C)/num_clusters*100:.1f}%)\n\n"
-        f"Overlap Analysis:\n"
-        f"  • Shared by all 3: {len(ABC)} ({len(ABC)/num_clusters*100:.1f}%)\n"
-        f"  • Shared by 2+ methods: {overlap_count} ({overlap_count/num_clusters*100:.1f}%)\n"
-        f"  • Unique to {method_names[0]}: {len(only_A)} ({len(only_A)/num_clusters*100:.1f}%)\n"
-        f"  • Unique to {method_names[1]}: {len(only_B)} ({len(only_B)/num_clusters*100:.1f}%)\n"
-        f"  • Unique to {method_names[2]}: {len(only_C)} ({len(only_C)/num_clusters*100:.1f}%)\n\n"
-    )
-
-    # Posiziona il box statistiche a destra
-    plt.text(
-        1.0,
+    stats_text = "\n".join(stats_lines)
+    fig.text(
+        1.01,
         0.5,
         stats_text,
-        transform=plt.gca().transAxes,
-        fontsize=10,
+        transform=fig.axes[0].transAxes,
+        fontsize=9,
         verticalalignment="center",
         fontfamily="monospace",
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8, pad=1),
     )
 
-    plt.tight_layout()
-    # plt.savefig(f"{DIVERSITY_OUTPUT_FOLDER}/coverage_venn.pdf", bbox_inches="tight")
+    fig.suptitle(f"Archive Coverage Overlap — Total Clusters: {num_clusters}", fontsize=16, fontweight="bold")
+
     plt.savefig(f"{DIVERSITY_OUTPUT_FOLDER}/coverage_venn.png", bbox_inches="tight", dpi=300)
+    plt.savefig(f"{DIVERSITY_OUTPUT_FOLDER}/coverage_venn.pdf", bbox_inches="tight")

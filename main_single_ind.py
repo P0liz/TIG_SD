@@ -2,8 +2,8 @@
 import torch
 import random
 import re
-import time
 
+from timer import Timer
 from folder import Folder
 from individual import Individual
 from predictor import Predictor
@@ -15,7 +15,7 @@ from config import *
 import utils
 
 # Local configuration
-MODE = "custom"  # Or standard
+MODE = "standard"  # Or "custom"
 SEED = random.randint(0, 2**32 - 1)
 
 
@@ -128,7 +128,6 @@ def main(prompt, expected_label, max_steps=NGEN):
     # Iterative mutation process
     iteration_times = []
     for step in range(1, max_steps + 1):
-        start_time = time.perf_counter()
 
         # Mutation
         prediction, confidence, selected_digit, other_digit = mutate_rand_digit(
@@ -149,7 +148,7 @@ def main(prompt, expected_label, max_steps=NGEN):
         img_euc_dist = utils.get_distance(selected_digit, other_digit, "image_euclidean")
         euc_img_dists.append(img_euc_dist)
 
-        elapsed = time.perf_counter() - start_time
+        elapsed = Timer.get_elapsed_time()
         iteration_times.append(elapsed)
         print(
             f"[{step:03d}] "
@@ -194,13 +193,16 @@ def main(prompt, expected_label, max_steps=NGEN):
 
 
 if __name__ == "__main__":
+    import config
 
     Folder.initialize()
+    Timer.initialize()
     random.seed(SEED)
     randprompt = random.choice(PROMPTS)
     expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
     main(prompt=randprompt, expected_label=expected_label)
     print("GAME OVER")
+    config.TRYNEW = not config.TRYNEW
 
 
 # source ./venv/bin/activate

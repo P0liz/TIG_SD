@@ -4,7 +4,7 @@ from config import *
 
 # standard
 from diffusers import StableDiffusionPipeline
-from diffusers.schedulers import DDIMScheduler
+from diffusers.schedulers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler
 
 # custom
 from transformers import CLIPTextModel, CLIPTokenizer
@@ -70,7 +70,12 @@ class SDPipelineManager:
         self.pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
 
         # Configure scheduler
-        self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config, rescale_betas_zero_snr=True)
+        if TRYNEW:
+            self.pipe.scheduler = EulerDiscreteScheduler.from_config(
+                self.pipe.scheduler.config, timestep_spacing="leading"
+            )
+        else:
+            self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config, rescale_betas_zero_snr=True)
 
     # ------------------------------------------------------
     #   CUSTOM IMPLEMENTATION

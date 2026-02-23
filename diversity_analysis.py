@@ -12,24 +12,25 @@ import matplotlib.cm as cm
 from data_visualization import plot_coverage_venn
 from config import ANALYSIS_CONFIG, DIVERSITY_OUTPUT_FOLDER, FOCUS_NAME, OTHERS_NAME
 
-
 # === LOCAL CONFIG ===
 SEED = 7  # For reproducibility
 MIN_CLUSTER_SIZE = 1  # Min samples per cluster
 if ANALYSIS_CONFIG == "single_run":
     METHODS_TO_COMPARE = {
-        FOCUS_NAME: "runs/archive_bucket/run_1770850981",
+        FOCUS_NAME: "runs/archive_bucket/run_123",  # specific run
         OTHERS_NAME: [  # Include tutte le altre run
             "runs/archive_size/run_*/",
             "runs/archive_dist/run_*/",
-            "runs/archive_bucket/run_*/",
+            "runs/archive_bucket_size/run_*/",
+            "runs/archive_bucket_dist/run_*/",
         ],
     }
 elif ANALYSIS_CONFIG == "archives":
     METHODS_TO_COMPARE = {
         "archive_size": "runs/archive_size/run_*/",
         "archive_dist": "runs/archive_dist/run_*/",
-        "archive_bucket": "runs/archive_bucket/run_*/",
+        "archive_bucket_size": "runs/archive_bucket_size/run_*/",
+        "archive_bucket_dist": "runs/archive_bucket_dist/run_*/",
     }
 
 """ Make sure the dataset of runs has the following structure
@@ -71,6 +72,8 @@ def load_archived_individuals(folder_pattern, method_name, exclude_path=None):
     else:
         print(f"Loading {method_name}: found {len(all_run_folders)} runs")
 
+    inds_per_run = []
+    elapsed_times = []  # in secondi
     for run_folder in all_run_folders:
         inds_folder = Path(run_folder) / "inds"
 
@@ -78,6 +81,23 @@ def load_archived_individuals(folder_pattern, method_name, exclude_path=None):
             print(f"Warning: inds folder not found in {run_folder}")
             continue
 
+        # Leggi elapsed time da stats.csv se presente
+        stats_file = Path(run_folder) / "stats.csv"
+        if stats_file.exists():
+            try:
+                df = pd.read_csv(stats_file, skipinitialspace=True)
+                df.columns = df.columns.str.strip()  # rimuove spazi dai nomi colonne
+                df["iteration"] = df["iteration"].str.strip()  # rimuove spazi dai valori
+
+                final_row = df[df["iteration"] == "final"]
+                if not final_row.empty:
+                    time_str = final_row["elapsed_time"].values[0].strip()
+                    td = pd.to_timedelta(time_str)
+                    elapsed_times.append(td.total_seconds())
+            except Exception as e:
+                print(f"Warning: could not read stats.csv in {run_folder}: {e}")
+
+        inds_count = 0
         for ind_dir in inds_folder.glob("ind*"):
             json_file = ind_dir / "data.json"
             m1_latent_file = ind_dir / "m1_latent.npy"
@@ -97,9 +117,16 @@ def load_archived_individuals(folder_pattern, method_name, exclude_path=None):
 
             # Append to list
             all_individuals.append([individual_data, method_name, expected_label])
+            inds_count += 1
+
+        inds_per_run.append(inds_count)
 
     print(f"Loaded {len(all_individuals)} individuals")
-    return all_individuals
+    # Get individuals per run stats
+    avg_inds = np.mean(inds_per_run)
+    std_inds = np.std(inds_per_run)
+    avg_elapsed = np.mean(elapsed_times)
+    return all_individuals, avg_inds, std_inds, avg_elapsed
 
 
 def compute_individual_distance_matrix(inds_data):
@@ -231,6 +258,7 @@ def compute_coverage_and_plot(inds_data, method_names, idx=0):
         print("Not enough data for clustering (need at least 4 samples)")
         return
 
+    # Metodo a cui ogni individuo appartiene
     labels_method = [sample[1] for sample in inds_data]
     print(f"Total samples: {len(inds_data)}")
 
@@ -268,8 +296,9 @@ def compute_coverage_and_plot(inds_data, method_names, idx=0):
 
     # Visualizzazione t-SNE usando la matrice di distanza personalizzata
     print(f"Feature dimension for t-SNE: {distance_matrix.shape[1]}")
+    perplexity = max(5, len(inds_data) // 8)  # Adjust perplexity based on sample size
     tsne_results = TSNE(
-        n_components=2, verbose=1, perplexity=15, metric="precomputed", init="random", random_state=SEED
+        n_components=2, verbose=1, perplexity=perplexity, metric="precomputed", init="random", random_state=SEED
     ).fit_transform(distance_matrix)
 
     # Calcola centroids NELLO SPAZIO t-SNE (2D)
@@ -296,7 +325,14 @@ def compute_coverage_and_plot(inds_data, method_names, idx=0):
     if ANALYSIS_CONFIG == "single_run":
         method_markers = {FOCUS_NAME: "v", OTHERS_NAME: "o"}
     elif ANALYSIS_CONFIG == "archives":
-        method_markers = {"archive_size": "s", "archive_dist": "d", "archive_bucket": "^"}
+        method_markers = {
+            "archive_size": "s",
+            "archive_dist": "d",
+            "archive_bucket_size": "^",
+            "archive_bucket_dist": "o",
+        }
+    else:
+        raise ValueError(f"Unknown ANALYSIS_CONFIG: {ANALYSIS_CONFIG}")
 
     # Plot centroids con colori corrispondenti ai cluster
     plt.scatter(
@@ -351,7 +387,7 @@ def compute_coverage_and_plot(inds_data, method_names, idx=0):
     plt.tight_layout()
     plt.savefig(f"{DIVERSITY_OUTPUT_FOLDER}/diversity_comparison_{idx}.pdf")
 
-    return coverage_dict_weighted, num_clusters
+    return coverage_dict_weighted, coverage_dict_unweighted, num_clusters
 
 
 def compute_archives_coverage(labels_method, cluster_labels, method_names):
@@ -421,7 +457,7 @@ def compute_weighted_coverage(labels_method, cluster_labels, method_names, dista
         method_diversity = 0.0
         if len(method_indices) > 1:
             method_dist_matrix = distance_matrix[np.ix_(method_indices, method_indices)]
-            mask = ~np.eye(len(method_indices), dtype=bool)
+            mask = ~np.eye(len(method_indices), dtype=bool)  # Esclude diagonale (distanza con se stessi)
             method_distances = method_dist_matrix[mask]
             if len(method_distances) > 0:
                 avg_method_dist = np.mean(method_distances)
@@ -429,7 +465,7 @@ def compute_weighted_coverage(labels_method, cluster_labels, method_names, dista
                 method_diversity = avg_method_dist / max_dist if max_dist > 0 else 0.5
                 method_diversity = min(method_diversity, 1.0)
 
-        # Coverage pesata: combina tre fattori
+        # Coverage pesata: combina fattori
         # 1. Coverage semplice (numero cluster coperti)
         # 2. Diversità interna (quanto sono diversi gli individui del metodo)
         coverage_weighted_final = (
@@ -456,7 +492,7 @@ def compute_all_single_runs():
     Restituisce un dizionario: {run_path: coverage}
     """
     # Carica TUTTE le run di TUTTI gli archivi
-    folder_patterns = ["runs/archive_size/run_*/", "runs/archive_dist/run_*/", "runs/archive_bucket/run_*/"]
+    folder_patterns = METHODS_TO_COMPARE[OTHERS_NAME]
 
     all_run_folders = []
     for pattern in folder_patterns:
@@ -489,7 +525,7 @@ def compute_all_single_runs():
         for method_name, folder_pattern in temp_methods.items():
             # Exclude focus run from "others"
             exclude_path = focus_run if method_name != "focus" else None
-            individuals = load_archived_individuals(folder_pattern, method_name, exclude_path)
+            individuals, _, _, _ = load_archived_individuals(folder_pattern, method_name, exclude_path)
             inds_data.extend(individuals)
             if len(individuals) > 0:
                 method_names.append(method_name)
@@ -505,8 +541,8 @@ def compute_all_single_runs():
         # Calcola coverage
         try:
             # Analisi
-            coverage_dict, _ = compute_coverage_and_plot(inds_data, method_names, idx)
-            coverage_results[focus_run] = coverage_dict[FOCUS_NAME]
+            coverage_dict_w, coverage_dict_uw, _ = compute_coverage_and_plot(inds_data, method_names, idx)
+            coverage_results[focus_run] = (coverage_dict_w[FOCUS_NAME], coverage_dict_uw[FOCUS_NAME])
 
         except Exception as e:
             print(f"Error: {e}")
@@ -519,17 +555,19 @@ def group_coverages_by_archive(coverage_results):
     """
     Raggruppa le coverage per archivio di appartenenza.
     """
-    grouped = {"archive_size": [], "archive_dist": [], "archive_bucket": []}
+    grouped = {"archive_size": [], "archive_dist": [], "archive_bucket_size": [], "archive_bucket_dist": []}
 
     for run_path, coverage in coverage_results.items():
+        # coverage è una tupla (weighted, unweighted)
         # Identifica archivio dalla path
         if "archive_size" in run_path:
             grouped["archive_size"].append(coverage)
         elif "archive_dist" in run_path:
             grouped["archive_dist"].append(coverage)
-        elif "archive_bucket" in run_path:
-            grouped["archive_bucket"].append(coverage)
-
+        elif "archive_bucket_size" in run_path:
+            grouped["archive_bucket_size"].append(coverage)
+        elif "archive_bucket_dist" in run_path:
+            grouped["archive_bucket_dist"].append(coverage)
     return grouped
 
 
@@ -552,50 +590,66 @@ def single_run_main():
     all_results = {}
     results_list = []
 
-    for archive_name in ["archive_size", "archive_dist", "archive_bucket"]:
-        coverages = grouped_coverages[archive_name]
+    for archive_name in ["archive_size", "archive_dist", "archive_bucket_size", "archive_bucket_dist"]:
+        both_coverages = grouped_coverages[archive_name]
 
-        if coverages:
-            avg = float(np.mean(coverages))
-            std = float(np.std(coverages))
-            min_cov = float(np.min(coverages))
-            max_cov = float(np.max(coverages))
-            median = float(np.median(coverages))
+        # Separa weighted e unweighted
+        coverages_weighted = [cov[0] for cov in both_coverages] if both_coverages else []
+        coverages_unweighted = [cov[1] for cov in both_coverages] if both_coverages else []
+
+        # Statistiche weighted
+        if coverages_weighted:
+            avg_w = float(np.mean(coverages_weighted))
+            std_w = float(np.std(coverages_weighted))
+            min_cov_w = float(np.min(coverages_weighted))
+            max_cov_w = float(np.max(coverages_weighted))
+            median_w = float(np.median(coverages_weighted))
         else:
-            avg = std = min_cov = max_cov = median = 0.0
+            avg_w = std_w = min_cov_w = max_cov_w = median_w = 0.0
+
+        # Statistiche unweighted
+        if coverages_unweighted:
+            avg_uw = float(np.mean(coverages_unweighted))
+            std_uw = float(np.std(coverages_unweighted))
+            min_cov_uw = float(np.min(coverages_unweighted))
+            max_cov_uw = float(np.max(coverages_unweighted))
+            median_uw = float(np.median(coverages_unweighted))
+        else:
+            avg_uw = std_uw = min_cov_uw = max_cov_uw = median_uw = 0.0
 
         # Calcola numero di individui per questo archivio (tutte le run di quell'archivio)
         archive_pattern = f"runs/{archive_name}/run_*/"
-        individuals = load_archived_individuals(archive_pattern, archive_name)
+        individuals, avg_inds, std_inds, elapsed_avg_time = load_archived_individuals(archive_pattern, archive_name)
         num_individuals = len(individuals)
 
         all_results[archive_name] = {
-            "num_runs": len(coverages),
+            "num_runs": len(both_coverages),
             "num_individuals": num_individuals,
-            "coverages": coverages,
-            "average": avg,
-            "std": std,
-            "min": min_cov,
-            "max": max_cov,
-            "median": median,
+            "avg_inds": avg_inds,
+            "std_inds": std_inds,
+            "avg -/+ std": (avg_inds - std_inds, avg_inds + std_inds),
+            "coverages_weighted": coverages_weighted,
+            "coverages_unweighted": coverages_unweighted,
+            "weighted": {"average": avg_w, "std": std_w, "min": min_cov_w, "max": max_cov_w, "median": median_w},
+            "unweighted": {"average": avg_uw, "std": std_uw, "min": min_cov_uw, "max": max_cov_uw, "median": median_uw},
+            "avg_run_time": elapsed_avg_time,
         }
 
         # Aggiungi alla lista per la tabella
         results_list.append(
             {
                 "Archive": archive_name,
-                "Runs": len(coverages),
+                "Runs": len(both_coverages),
                 "Total Individuals": num_individuals,
-                "Average Coverage (%)": round(avg, 2),
-                "Std Deviation (%)": round(std, 2),
-                "Min (%)": round(min_cov, 2),
-                "Max (%)": round(max_cov, 2),
-                "Median (%)": round(median, 2),
+                "Avg ± Std Inds per Run": f"{round(float(avg_inds), 2)} ± {round(float(std_inds), 2)}",
+                "Avg ± Std Weighted Coverage (%)": f"{round(avg_w, 2)} ± {round(std_w, 2)}",
+                "Avg ± Std Unweighted Coverage(%)": f"{round(avg_uw, 2)} ± {round(std_uw, 2)}",
+                "Avg Run Time(s)": elapsed_avg_time,
             }
         )
 
     # Salva risultati in json
-    with open(f"{DIVERSITY_OUTPUT_FOLDER}/all_coverages.json", "w") as f:
+    with open(f"{DIVERSITY_OUTPUT_FOLDER}/coverages.json", "w") as f:
         json.dump(all_results, f, indent=2)
 
     # Crea e salva tabella
@@ -607,7 +661,7 @@ def single_run_main():
     print(f"(Each run vs all other runs from all archives)")
     print(df.to_string(index=False))
 
-    print(f"Coverage results saved to {DIVERSITY_OUTPUT_FOLDER}/all_coverages.json")
+    print(f"Coverage results saved to {DIVERSITY_OUTPUT_FOLDER}/coverages.json")
     print(f"Summary table saved to {DIVERSITY_OUTPUT_FOLDER}/coverages_summary.csv")
 
 
@@ -618,7 +672,7 @@ def archive_main():
 
     # Load data from all methods
     for method_name, folder_pattern in METHODS_TO_COMPARE.items():
-        individuals = load_archived_individuals(folder_pattern, method_name)
+        individuals, _, _, _ = load_archived_individuals(folder_pattern, method_name)
         all_data.extend(individuals)
         num_individuals_per_method[method_name] = len(individuals)
         if len(individuals) > 0:
@@ -629,21 +683,32 @@ def archive_main():
         exit(1)
 
     # Analisi
-    coverage_dict, num_clusters = compute_coverage_and_plot(all_data, method_names)
+    coverage_dict_w, coverage_dict_uw, num_clusters = compute_coverage_and_plot(all_data, method_names)
 
     # Prepara dati per salvataggio
-    results_data = {"num_clusters": num_clusters, "total_samples": len(all_data), "coverage": coverage_dict}
+    results_data = {
+        "num_clusters": num_clusters,
+        "total_samples": len(all_data),
+        "coverage_weighted": coverage_dict_w,
+        "coverage_unweighted": coverage_dict_uw,
+    }
 
     # Aggiungi numero di individui per ogni archivio
     results_list = []
     for method_name, folder_pattern in METHODS_TO_COMPARE.items():
         num_individuals = num_individuals_per_method.get(method_name, 0)
-        coverage_value = coverage_dict.get(method_name, 0.0)
+        coverage_w = coverage_dict_w.get(method_name, 0.0)
+        coverage_uw = coverage_dict_uw.get(method_name, 0.0)
 
         results_data[f"{method_name}_individuals"] = num_individuals
 
         results_list.append(
-            {"Archive": method_name, "Total Individuals": num_individuals, "Coverage (%)": round(coverage_value, 2)}
+            {
+                "Archive": method_name,
+                "Total Individuals": num_individuals,
+                "Coverage Weighted (%)": round(coverage_w, 2),
+                "Coverage Unweighted (%)": round(coverage_uw, 2),
+            }
         )
 
     # Salva risultati in JSON

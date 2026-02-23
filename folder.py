@@ -13,12 +13,14 @@ class Folder:
     method = None
 
     @classmethod
-    def initialize(cls, custom_run_id=None, method=ARCHIVE_TYPE):
+    def initialize(cls, custom_run_id=None, method=None):
         Timer.start = datetime.now()
         cls.run_id = custom_run_id or str(Timer.start.strftime("%s"))
         cls.method = method
         if method == "bucket":
             cls.method = f"bucket_{BUCKET_CONFIG}"
+        elif method == None:
+            cls.method = "none"
 
         # Create structure: runs/{method}/run_{id}/
         cls.DST = join("runs", f"archive_{cls.method}", f"run_{cls.run_id}")
