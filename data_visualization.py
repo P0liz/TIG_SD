@@ -3,8 +3,8 @@ from PIL import Image
 import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+from venn import venn
 
-from upsetplot import UpSet, from_memberships
 from config import PROMPTS, ANALYSIS_CONFIG, DIVERSITY_OUTPUT_FOLDER, FOCUS_NAME, OTHERS_NAME
 
 
@@ -221,18 +221,18 @@ def plot_diversity_with_expected_labels(
     plt.show()
 
 
-def plot_coverage_venn(all_data, cluster_labels, method_names):
+def plot_coverage_venn(inds_data, cluster_labels, method_names):
     """
-    Crea un UpSet plot per mostrare overlap di coverage tra 4 archivi.
+    Crea un diagramma di Venn per mostrare overlap di coverage tra 4 archivi.
     """
-    assert ANALYSIS_CONFIG == "archives", "UpSet plot is only for archives comparison"
+    assert ANALYSIS_CONFIG == "archives", "Venn diagram is only for archives comparison"
 
     if len(method_names) != 4:
-        print(f"This function requires exactly 4 methods, got {len(method_names)}")
+        print(f"Venn diagram requires exactly 4 methods, got {len(method_names)}")
         return None
 
     num_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
-    labels_method = [sample[1] for sample in all_data]
+    labels_method = [sample[0] for sample in inds_data]
 
     # Calcola quali cluster copre ogni metodo
     method_clusters = {}
@@ -240,59 +240,50 @@ def plot_coverage_venn(all_data, cluster_labels, method_names):
         method_indices = [i for i, label in enumerate(labels_method) if label == method]
         method_clusters[method] = set(cluster_labels[i] for i in method_indices if cluster_labels[i] != -1)
 
-    # Per ogni cluster, determina a quali metodi appartiene
-    all_covered_clusters = set.union(*method_clusters.values())
-    memberships = []
-    for cluster in all_covered_clusters:
-        membership = [m for m in method_names if cluster in method_clusters[m]]
-        memberships.append(membership)
+    set_A = method_clusters[method_names[0]]
+    set_B = method_clusters[method_names[1]]
+    set_C = method_clusters[method_names[2]]
+    set_D = method_clusters[method_names[3]]
 
-    # Costruisci UpSet data
-    upset_data = from_memberships(memberships)
+    sets_dict = {method_names[0]: set_A, method_names[1]: set_B, method_names[2]: set_C, method_names[3]: set_D}
 
-    # Plot
-    fig = plt.figure(figsize=(16, 8))
-    upset = UpSet(upset_data, subset_size="count", show_counts=True, sort_by="cardinality")
-    upset.plot(fig)
+    plt.figure(figsize=(14, 10))
 
-    # Statistiche individuali
-    stats_lines = ["INDIVIDUAL COVERAGE", "=" * 35]
-    for method in method_names:
-        n = len(method_clusters[method])
-        stats_lines.append(f"  {method}: {n} clusters ({n/num_clusters*100:.1f}%)")
+    venn(sets_dict, fmt="{size}\n({percentage:.1f}%)", fontsize=8)
 
-    # Intersezioni notevoli
-    sets = [method_clusters[m] for m in method_names]
-    union_all = set.union(*sets)
-    intersect_all = set.intersection(*sets)
-    stats_lines += [
-        "",
-        "INTERSECTIONS",
-        "=" * 35,
-        f"  Union (≥1 method):  {len(union_all)} ({len(union_all)/num_clusters*100:.1f}%)",
-        f"  Common to all 4:    {len(intersect_all)} ({len(intersect_all)/num_clusters*100:.1f}%)",
-    ]
+    plt.title(
+        f"Archive Coverage Overlap (4 Methods)\nTotal Clusters: {num_clusters}", fontsize=16, fontweight="bold", pad=20
+    )
 
-    # Unici per metodo
-    stats_lines += ["", "UNIQUE CLUSTERS", "=" * 35]
-    for i, method in enumerate(method_names):
-        others = set.union(*[method_clusters[m] for m in method_names if m != method])
-        unique = method_clusters[method] - others
-        stats_lines.append(f"  Unique to {method}: {len(unique)} ({len(unique)/num_clusters*100:.1f}%)")
+    # Calcolo statistiche
+    union_all = set_A | set_B | set_C | set_D
+    intersection_all = set_A & set_B & set_C & set_D
 
-    stats_text = "\n".join(stats_lines)
-    fig.text(
-        1.01,
+    stats_text = (
+        f"COVERAGE STATISTICS\n"
+        f"{'='*40}\n\n"
+        f"Individual Coverage:\n"
+        f"  • {method_names[0]}: {len(set_A)} ({len(set_A)/num_clusters*100:.1f}%)\n"
+        f"  • {method_names[1]}: {len(set_B)} ({len(set_B)/num_clusters*100:.1f}%)\n"
+        f"  • {method_names[2]}: {len(set_C)} ({len(set_C)/num_clusters*100:.1f}%)\n"
+        f"  • {method_names[3]}: {len(set_D)} ({len(set_D)/num_clusters*100:.1f}%)\n\n"
+        f"Union (coperti da almeno uno): {len(union_all)} "
+        f"({len(union_all)/num_clusters*100:.1f}%)\n"
+        f"Shared by all archives: {len(intersection_all)} "
+        f"({len(intersection_all)/num_clusters*100:.1f}%)\n"
+    )
+
+    plt.text(
+        1.05,
         0.5,
         stats_text,
-        transform=fig.axes[0].transAxes,
-        fontsize=9,
+        transform=plt.gca().transAxes,
+        fontsize=10,
         verticalalignment="center",
         fontfamily="monospace",
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8, pad=1),
     )
 
-    fig.suptitle(f"Archive Coverage Overlap — Total Clusters: {num_clusters}", fontsize=16, fontweight="bold")
-
+    plt.tight_layout()
     plt.savefig(f"{DIVERSITY_OUTPUT_FOLDER}/coverage_venn.png", bbox_inches="tight", dpi=300)
-    plt.savefig(f"{DIVERSITY_OUTPUT_FOLDER}/coverage_venn.pdf", bbox_inches="tight")
+    plt.close()

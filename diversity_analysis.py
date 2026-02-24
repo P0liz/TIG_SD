@@ -10,11 +10,13 @@ from sklearn.metrics import silhouette_score
 import matplotlib.cm as cm
 
 from data_visualization import plot_coverage_venn
-from config import ANALYSIS_CONFIG, DIVERSITY_OUTPUT_FOLDER, FOCUS_NAME, OTHERS_NAME
+from config import ANALYSIS_CONFIG, DIVERSITY_OUTPUT_FOLDER, FOCUS_NAME, OTHERS_NAME, PROMPTS
 
 # === LOCAL CONFIG ===
 SEED = 7  # For reproducibility
 MIN_CLUSTER_SIZE = 1  # Min samples per cluster
+PERCENTILE_THD = 25  # For clustering threshold
+
 if ANALYSIS_CONFIG == "single_run":
     METHODS_TO_COMPARE = {
         FOCUS_NAME: "runs/archive_bucket/run_123",  # specific run
@@ -116,7 +118,7 @@ def load_archived_individuals(folder_pattern, method_name, exclude_path=None):
             expected_label = ind_data.get("m1", {}).get("expected_label", "unknown")
 
             # Append to list
-            all_individuals.append([individual_data, method_name, expected_label])
+            all_individuals.append([method_name, individual_data, expected_label])
             inds_count += 1
 
         inds_per_run.append(inds_count)
@@ -138,8 +140,8 @@ def compute_individual_distance_matrix(inds_data):
     for i in range(n):
         for j in range(i + 1, n):
             # Load individuals as couples
-            m1_i, m2_i = inds_data[i][0]
-            m1_j, m2_j = inds_data[j][0]
+            m1_i, m2_i = inds_data[i][1]
+            m1_j, m2_j = inds_data[j][1]
 
             # Compute distance formula
             a = np.linalg.norm(m1_i - m1_j)  # i1.m1 vs i2.m1
@@ -155,22 +157,19 @@ def compute_individual_distance_matrix(inds_data):
 
 
 # === CLUSTERING ===
-def agg_cluster_data_silh(data, n_clusters_interval, min_cluster_size=None):
+def agg_cluster_data_silh(inds_data, n_clusters_interval, distance_matrix, min_cluster_size=MIN_CLUSTER_SIZE):
     assert n_clusters_interval[0] >= 2, "Min number of clusters must be >= 2"
 
-    n_samples = len(data)
+    n_samples = len(inds_data)
 
     # Apply min_cluster_size constraint
-    if min_cluster_size is not None:
+    if min_cluster_size > 1:
         max_possible = n_samples // min_cluster_size
         upper_bound = min(n_clusters_interval[1], max_possible, n_samples - 1)
         print(f"Sample size: {n_samples}, min_cluster_size: {min_cluster_size}")
         print(f"Max possible clusters: {max_possible}")
     else:
         upper_bound = min(n_clusters_interval[1], n_samples - 1)
-
-    # Compute custom distance matrix
-    distance_matrix = compute_individual_distance_matrix(data)
 
     range_n_clusters = np.arange(n_clusters_interval[0], upper_bound + 1)
     optimal_score = -1
@@ -215,18 +214,15 @@ def agg_cluster_data_silh(data, n_clusters_interval, min_cluster_size=None):
         medoid_local_idx = cluster_dist.sum(axis=1).argmin()
         medoid_idx = cluster_indices[medoid_local_idx]
 
-        centers.append(data[medoid_idx][0])  # Individual vector
+        centers.append(inds_data[medoid_idx][1])  # Individual vectors couple
 
-    return optimal_labels, np.array(centers), distance_matrix
+    return optimal_labels, np.array(centers)
 
 
-def agg_cluster_data_thd(data):
-    # Compute custom distance matrix
-    distance_matrix = compute_individual_distance_matrix(data)
-
+def agg_cluster_data_thd(inds_data, distance_matrix):
     """Cluster using fixed threshold based on distance distribution"""
     all_distances = distance_matrix[np.triu_indices_from(distance_matrix, k=1)]
-    threshold = np.percentile(all_distances, 30)  # 30th percentile
+    threshold = np.percentile(all_distances, PERCENTILE_THD)
     print(f"Selected threshold={threshold:.3f}")
 
     # Clustering with distance threshold
@@ -245,13 +241,13 @@ def agg_cluster_data_thd(data):
         cluster_indices = np.where(cluster_labels == k)[0]
         cluster_dist = distance_matrix[np.ix_(cluster_indices, cluster_indices)]
         medoid_idx = cluster_indices[cluster_dist.sum(axis=1).argmin()]
-        centers.append(data[medoid_idx][0])
+        centers.append(inds_data[medoid_idx][1])  # Individual vectors couple
 
-    return cluster_labels, np.array(centers), distance_matrix
+    return cluster_labels, np.array(centers)
 
 
 # === COVERAGE CALCULATION ===
-def compute_coverage_and_plot(inds_data, method_names, idx=0):
+def compute_coverage_and_plot(inds_data, method_names, distance_matrix, idx=0):
     """Calcola coverage e visualizza con t-SNE"""
 
     if len(inds_data) < 4:
@@ -259,15 +255,15 @@ def compute_coverage_and_plot(inds_data, method_names, idx=0):
         return
 
     # Metodo a cui ogni individuo appartiene
-    labels_method = [sample[1] for sample in inds_data]
+    labels_method = [sample[0] for sample in inds_data]
     print(f"Total samples: {len(inds_data)}")
 
     # Clustering con range per numero di cluster
-    # max_clusters = min(len(all_data) - 1, 20)
-    # cluster_labels, centers, distance_matrix = agg_cluster_data_silh(all_data, (2, max_clusters), MIN_CLUSTER_SIZE)
+    # max_clusters = min(len(inds_data) - 1, 20)
+    # cluster_labels, centers = agg_cluster_data_silh(inds_data, (2, max_clusters), distance_matrix)
 
     # Clustering con threshold fisso per taglio dendogramma
-    cluster_labels, centers, distance_matrix = agg_cluster_data_thd(inds_data)
+    cluster_labels, centers = agg_cluster_data_thd(inds_data, distance_matrix)
 
     num_clusters = len(centers)
     print(f"Total clusters: {num_clusters}")
@@ -431,7 +427,7 @@ def compute_weighted_coverage(labels_method, cluster_labels, method_names, dista
     """
     num_clusters = len(set(cluster_labels))
 
-    print("\n=== WEIGHTED COVERAGE ANALYSIS ===")
+    print("Coverage calculation with weighting factors...")
     coverage_weighted = {}
     coverage_unweighted = {}
 
@@ -505,14 +501,26 @@ def compute_all_single_runs():
         inds_folder = Path(folder) / "inds"
         if not inds_folder.exists():
             all_run_folders.remove(folder)
-
     print(f"Total runs found: {len(all_run_folders)}")
+
+    # Load all inds data from all runs (for global distance matrix)
+    all_individuals_data = []
+    for folder in all_run_folders:
+        individuals, _, _, _ = load_archived_individuals(folder, folder)  # using folder as method_name just for loading
+        all_individuals_data.extend(individuals)
+
+    # Calculate global distance matrix once for all individuals (efficiency)
+    global_distance_matrix = compute_individual_distance_matrix(all_individuals_data)
+    global_paths = [sample[0] for sample in all_individuals_data]  # label = run path
 
     coverage_results = {}  # {run_path: coverage_percentage}
     for idx, focus_run in enumerate(all_run_folders):
-        idx = idx + 1  # Start index from 1 for better readability
-        print(f"\nProcessing run {idx}/{len(all_run_folders)}: {Path(focus_run).name}")
+        # Start index from 1 for better readability
+        # Index 0 reserved for full archive all runs analysis if needed
+        idx = idx + 1
+        print(f"\n=== PROCESSING RUN {idx}/{len(all_run_folders)}: {Path(focus_run).name} ===")
 
+        """
         # Prepara config per questa iterazione
         # Focus: questa run
         # Others: TUTTE le run (di tutti gli archivi)
@@ -530,18 +538,36 @@ def compute_all_single_runs():
             if len(individuals) > 0:
                 method_names.append(method_name)
 
+        # Compute custom distance matrix
+        distance_matrix = compute_individual_distance_matrix(inds_data)
+        """
+        # Trova gli indici nella matrice globale
+        focus_indices = [i for i, p in enumerate(global_paths) if p == focus_run]
+        others_indices = [i for i, p in enumerate(global_paths) if p != focus_run]
+
+        all_indices = focus_indices + others_indices
+
+        # Estrai sottomatrice già calcolata
+        sub_matrix = global_distance_matrix[np.ix_(all_indices, all_indices)]
+
+        # Ricostruisci inds_data con le label corrette per questa iterazione
+        groups = {FOCUS_NAME: focus_indices, OTHERS_NAME: others_indices}
+        inds_data = [[label, *all_individuals_data[i][1:]] for label, indices in groups.items() for i in indices]
+
         if len(inds_data) < 4:
             print(f"Not enough data, skipping")
             continue
 
         print(f"Total samples: {len(inds_data)}")
-        print(f"Focus: {len([d for d in inds_data if d[1]=='focus'])} samples")
-        print(f"Others: {len([d for d in inds_data if d[1]=='others'])} samples")
+        print(f"Focus: {len([d for d in inds_data if d[0]=='focus'])} samples")
+        print(f"Others: {len([d for d in inds_data if d[0]=='others'])} samples")
 
         # Calcola coverage
         try:
             # Analisi
-            coverage_dict_w, coverage_dict_uw, _ = compute_coverage_and_plot(inds_data, method_names, idx)
+            coverage_dict_w, coverage_dict_uw, _ = compute_coverage_and_plot(
+                inds_data, [FOCUS_NAME, OTHERS_NAME], sub_matrix, idx
+            )
             coverage_results[focus_run] = (coverage_dict_w[FOCUS_NAME], coverage_dict_uw[FOCUS_NAME])
 
         except Exception as e:
@@ -569,6 +595,15 @@ def group_coverages_by_archive(coverage_results):
         elif "archive_bucket_dist" in run_path:
             grouped["archive_bucket_dist"].append(coverage)
     return grouped
+
+
+def calculate_label_coverage(inds_data):
+    covered_labels = {}  # {expected_label: count}
+    for sample in inds_data:
+        label = sample[2]  # The expected label
+        covered_labels[label] = covered_labels.get(label, 0) + 1
+    label_coverage = len(covered_labels) / len(PROMPTS) * 100
+    return label_coverage
 
 
 # =================================================================
@@ -621,6 +656,7 @@ def single_run_main():
         archive_pattern = f"runs/{archive_name}/run_*/"
         individuals, avg_inds, std_inds, elapsed_avg_time = load_archived_individuals(archive_pattern, archive_name)
         num_individuals = len(individuals)
+        label_coverage = calculate_label_coverage(individuals)
 
         all_results[archive_name] = {
             "num_runs": len(both_coverages),
@@ -632,6 +668,7 @@ def single_run_main():
             "coverages_unweighted": coverages_unweighted,
             "weighted": {"average": avg_w, "std": std_w, "min": min_cov_w, "max": max_cov_w, "median": median_w},
             "unweighted": {"average": avg_uw, "std": std_uw, "min": min_cov_uw, "max": max_cov_uw, "median": median_uw},
+            "label_coverage": label_coverage,
             "avg_run_time": elapsed_avg_time,
         }
 
@@ -644,6 +681,7 @@ def single_run_main():
                 "Avg ± Std Inds per Run": f"{round(float(avg_inds), 2)} ± {round(float(std_inds), 2)}",
                 "Avg ± Std Weighted Coverage (%)": f"{round(avg_w, 2)} ± {round(std_w, 2)}",
                 "Avg ± Std Unweighted Coverage(%)": f"{round(avg_uw, 2)} ± {round(std_uw, 2)}",
+                "Label Coverage (%)": round(label_coverage, 2),
                 "Avg Run Time(s)": elapsed_avg_time,
             }
         )
@@ -666,31 +704,41 @@ def single_run_main():
 
 
 def archive_main():
-    all_data = []  # Store individuals data
+    inds_data = []  # Store individuals data
     method_names = []  # Store corresponding method used
     num_individuals_per_method = {}  # Count individuals per method
+    label_coverages = {}  # Store label coverage per method
 
     # Load data from all methods
     for method_name, folder_pattern in METHODS_TO_COMPARE.items():
         individuals, _, _, _ = load_archived_individuals(folder_pattern, method_name)
-        all_data.extend(individuals)
+        inds_data.extend(individuals)
         num_individuals_per_method[method_name] = len(individuals)
         if len(individuals) > 0:
             method_names.append(method_name)
 
-    if len(all_data) == 0:
+        coverage = calculate_label_coverage(individuals)
+        label_coverages[method_name] = coverage
+
+    if len(inds_data) == 0:
         print("ERROR: No data loaded!")
         exit(1)
 
+    # Calculate distance matrix once for all individuals
+    distance_matrix = compute_individual_distance_matrix(inds_data)
+
     # Analisi
-    coverage_dict_w, coverage_dict_uw, num_clusters = compute_coverage_and_plot(all_data, method_names)
+    coverage_dict_w, coverage_dict_uw, num_clusters = compute_coverage_and_plot(
+        inds_data, method_names, distance_matrix
+    )
 
     # Prepara dati per salvataggio
     results_data = {
         "num_clusters": num_clusters,
-        "total_samples": len(all_data),
+        "total_samples": len(inds_data),
         "coverage_weighted": coverage_dict_w,
         "coverage_unweighted": coverage_dict_uw,
+        "label_coverages": label_coverages,
     }
 
     # Aggiungi numero di individui per ogni archivio
@@ -699,6 +747,7 @@ def archive_main():
         num_individuals = num_individuals_per_method.get(method_name, 0)
         coverage_w = coverage_dict_w.get(method_name, 0.0)
         coverage_uw = coverage_dict_uw.get(method_name, 0.0)
+        label_coverage = label_coverages.get(method_name, 0.0)
 
         results_data[f"{method_name}_individuals"] = num_individuals
 
@@ -708,6 +757,7 @@ def archive_main():
                 "Total Individuals": num_individuals,
                 "Coverage Weighted (%)": round(coverage_w, 2),
                 "Coverage Unweighted (%)": round(coverage_uw, 2),
+                "Label Coverage (%)": round(label_coverage, 2),
             }
         )
 
@@ -722,7 +772,7 @@ def archive_main():
     # Stampa tabella
     print("\n=== FINAL RESULTS ===")
     print(f"Total clusters: {num_clusters}")
-    print(f"Total samples: {len(all_data)}")
+    print(f"Total samples: {len(inds_data)}")
     print("Coverage by Archive:")
     print(df.to_string(index=False))
 
