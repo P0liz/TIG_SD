@@ -8,7 +8,7 @@ from folder import Folder
 from individual import Individual
 from predictor import Predictor
 from member_mutator import MemberMutator
-from mnist_member import MnistMember
+from member import Member
 from diffusion import pipeline_manager
 from data_visualization import export_as_gif, plot_distance
 from config import *
@@ -19,7 +19,7 @@ MODE = "standard"  # Or "custom"
 SEED = random.randint(0, 2**32 - 1)
 
 
-def mutate_rand_digit(m1: "MemberMutator", m2: "MemberMutator", images1, images2, generator=None):
+def mutate_rand_member(m1: "MemberMutator", m2: "MemberMutator", images1, images2, generator=None):
     # Scegli membro casuale
     if random.getrandbits(1):
         selected_m = m1
@@ -39,21 +39,24 @@ def mutate_rand_digit(m1: "MemberMutator", m2: "MemberMutator", images1, images2
         raise ValueError("Unknown mode")
 
     if is1:
-        images1.append(selected_m.members.image_tensor)
+        images1.append(selected_m.members[0].image_tensor)
     else:
-        images2.append(selected_m.members.image_tensor)
+        images2.append(selected_m.members[0].image_tensor)
 
     # Predici
-    prediction, confidence = Predictor.predict_single(selected_m.members, selected_m.members.expected_label)
-    selected_m.members.confidence_history.append(confidence)
+    prediction, confidence = Predictor.predict_single(selected_m.members[0], selected_m.members[0].expected_label)
+    selected_m.members[0].confidence_history.append(confidence)
 
     # If confidence diff is too low and the or confidence is higher then...
-    if abs(confidence - selected_m.members.confidence) <= CONF_CHANGE or confidence >= selected_m.members.confidence:
-        selected_m.members.standing_steps += 1
+    if (
+        abs(confidence - selected_m.members[0].confidence) <= CONF_CHANGE
+        or confidence >= selected_m.members[0].confidence
+    ):
+        selected_m.members[0].standing_steps += 1
     else:
-        selected_m.members.standing_steps = 0
+        selected_m.members[0].standing_steps = 0
 
-    return prediction, confidence, selected_m.members, other_m.members
+    return prediction, confidence, selected_m.members[0], other_m.members[0]
 
 
 def main(prompt, expected_label, max_steps=NGEN):
@@ -80,31 +83,31 @@ def main(prompt, expected_label, max_steps=NGEN):
         initial_latent = torch.randn(
             (1, unet_channels, HEIGHT // 8, WIDTH // 8), device=DEVICE, dtype=DTYPE, generator=generator
         )
-        digit1 = MnistMember(initial_latent, expected_label)
+        member1 = Member(initial_latent, expected_label)
 
         # Initial generation and validation
         # Higher guidance_scale to assure the prompt is followed correctly
-        mutator1 = MemberMutator(prompt, digit1)
+        mutator1 = MemberMutator(prompt, member1)
         if MODE == "custom":
             mutator1.denoise_and_decode(isMutating=False, guidance_scale=3.5, generator=generator)
         elif MODE == "standard":
             mutator1.generate(guidance_scale=3.5, generator=generator)
         else:
             raise ValueError("Unknown mode")
-        prediction, confidence = Predictor.predict_single(digit1, expected_label)
+        prediction, confidence = Predictor.predict_single(member1, expected_label)
 
         # Initial assignment
-        digit1.predicted_label = prediction
-        digit1.confidence = confidence
-        digit1.confidence_history.append(digit1.confidence)
-        if digit1.expected_label == digit1.predicted_label:
-            digit1.correctly_classified = True
+        member1.predicted_label = prediction
+        member1.confidence = confidence
+        member1.confidence_history.append(member1.confidence)
+        if member1.expected_label == member1.predicted_label:
+            member1.correctly_classified = True
         else:
-            digit1.correctly_classified = False
+            member1.correctly_classified = False
 
-        if not digit1.correctly_classified:
+        if not member1.correctly_classified:
             print(prompt, " - exp: ", expected_label)
-            print(f"pred={digit1.predicted_label} " f"exp={digit1.expected_label}")
+            print(f"pred={member1.predicted_label} " f"exp={member1.expected_label}")
             print("Initial latent does not satisfy the label")
             tries += 1
         else:
@@ -112,12 +115,12 @@ def main(prompt, expected_label, max_steps=NGEN):
 
     # second member of an Individual
     mutator2 = mutator1.clone()
-    digit2 = mutator2.members
+    member2 = mutator2.members[0]
 
-    print(f"[000] " f"exp={digit1.expected_label} " f"conf={digit1.confidence:.3f}")
+    print(f"[000] " f"exp={member1.expected_label} " f"conf={member1.confidence:.3f}")
 
-    images1 = [digit1.image_tensor]
-    images2 = [digit2.image_tensor]
+    images1 = [member1.image_tensor]
+    images2 = [member2.image_tensor]
     euc_img_dists = []
     euc_img_dists.append(0)
     euc_dists = []
@@ -130,7 +133,7 @@ def main(prompt, expected_label, max_steps=NGEN):
     for step in range(1, max_steps + 1):
 
         # Mutation
-        prediction, confidence, selected_digit, other_digit = mutate_rand_digit(
+        prediction, confidence, selected_digit, other_digit = mutate_rand_member(
             mutator1, mutator2, images1, images2, generator
         )
 
@@ -175,7 +178,7 @@ def main(prompt, expected_label, max_steps=NGEN):
     print(f"  Avg per iteration: {sum(iteration_times)/len(iteration_times)}s")
     print(f"  Min: {min(iteration_times)}s, Max: {max(iteration_times)}s")
 
-    ind = Individual(digit1, digit2, prompt, None)  # Create final individual to see results
+    ind = Individual(member1, member2, prompt, None)  # Create final individual to see results
     ind.misstep = step
     ind.bad_prediction = selected_digit.predicted_label
     ind.members_distance = euc_dist

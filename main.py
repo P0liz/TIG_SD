@@ -5,7 +5,7 @@ import torch
 from deap import base, creator, tools
 from deap.tools.emo import selNSGA2
 
-from mnist_member import MnistMember
+from member import Member
 from member_mutator import MemberMutator
 from predictor import Predictor
 import archive_manager
@@ -53,7 +53,7 @@ class GeneticAlgorithm:
                 (1, pipe.unet.config.in_channels, HEIGHT // 8, WIDTH // 8), device=DEVICE, dtype=DTYPE
             )
             # Generate member and classify it
-            member = MnistMember(og_latent, expected_label)
+            member = Member(og_latent, expected_label)
             MemberMutator(prompt, member).generate(guidance_scale=guidance_scale)
             prediction, confidence = Predictor.predict_single(member, expected_label)
 
@@ -70,12 +70,16 @@ class GeneticAlgorithm:
         print(f"Failed to generate valid member for label {expected_label}")
         return None
 
-    def create_individual(self, prompt, label=None):
+    def create_individual(self, label=None):
         if label is None:
             label = random.randint(0, 9)
+
         # Override label if specified in config
-        if DATASET == "imagenet":
+        if DATASET == "mnist":
+            prompt = PROMPTS[label]
+        elif DATASET == "imagenet":
             label = IMAGENET_LABEL
+            prompt = PROMPTS[0]
 
         # Generate members
         m1 = self.generate_member(prompt, label)
@@ -134,8 +138,8 @@ class GeneticAlgorithm:
     # ========================================================================
     def mutate_individuals(self, individuals: list["Individual"]):
         # Batch mutation for all individuals in the population
-        members_to_mutate: list[MnistMember] = []
-        other_members: list[MnistMember] = []
+        members_to_mutate: list[Member] = []
+        other_members: list[Member] = []
         prompts = []
         for ind in individuals:
             # Chose random member
@@ -171,7 +175,7 @@ class GeneticAlgorithm:
         Args:
             individuals (_type_): _description_
         """
-        members_to_predict: list[MnistMember] = []
+        members_to_predict: list[Member] = []
 
         for ind in individuals:
             if ind.m1.predicted_label is None:
@@ -372,7 +376,7 @@ class GeneticAlgorithm:
             offspring = [self.clone_individual(ind) for ind in offspring]
 
             # 2. Reseeding
-            if len(self.archive.get_archive()) > 0 and gen % RESEED_INTERVAL == 0:
+            if len(self.archive.get_archive()) > 0 and gen % RESEED_INTERVAL == 0 and DATASET == "mnist":
                 n_reseed = random.randint(1, RESEEDUPPERBOUND)
                 population = self.reseed_population(population, n_reseed)
 

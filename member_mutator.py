@@ -1,7 +1,7 @@
-# %%writefile digit_mutator.py
+# %%writefile member_mutator.py
 import mutation_manager
 from config import DEVICE
-from mnist_member import MnistMember
+from member import Member
 import torch
 from diffusion import pipeline_manager
 
@@ -9,8 +9,12 @@ from diffusion import pipeline_manager
 class MemberMutator:
 
     def __init__(self, prompts, members, mutation_step=4):
+        if not isinstance(prompts, list):
+            prompts = [prompts]
+        if not isinstance(members, list):
+            members = [members]
         self.prompts = prompts
-        self.members: list[MnistMember] = members
+        self.members: list[Member] = members
 
         # Custom mode caching setup
         if pipeline_manager._mode == "custom":
@@ -52,7 +56,7 @@ class MemberMutator:
     def clone(self):
         """Clone the mutator with a new member instance but shared cache"""
         cloned_members = [member.clone() for member in self.members]
-        cloned_mutator = MemberMutator(self.prompts, cloned_members, self.mutation_step)
+        cloned_mutator = MemberMutator(self.prompts, cloned_members)
 
         # Shared cache between original and clone
         if pipeline_manager._mode == "custom":
@@ -110,8 +114,8 @@ class MemberMutator:
     def generate(self, guidance_scale=2.5, generator=None):
         assert pipeline_manager._mode == "standard", "generate() only works in standard mode"
 
-        latents = [member.latent for member in self.members]
-        mutated_tensors, images = mutation_manager.generate(self.prompts, latents, guidance_scale, generator)
+        batch_latents = torch.cat([member.latent for member in self.members])
+        mutated_tensors, images = mutation_manager.generate(self.prompts, batch_latents, guidance_scale, generator)
         # Update state
         for i, member in enumerate(self.members):
             member.image_tensor = mutated_tensors[i]

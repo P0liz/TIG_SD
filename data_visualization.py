@@ -20,10 +20,29 @@ def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
     """
     pil_images = []
     for img in images:
-        # Converting tensor to PIL Image (in grayscale)
-        img_np = img.detach().cpu().numpy().squeeze()
-        img_np = (img_np * 255).astype("uint8")
-        pil_images.append(Image.fromarray(img_np, mode="L"))
+        # Skip conversion if it's already a PIL Image
+        print(type(img), img.shape if hasattr(img, "shape") else "no shape")
+        if isinstance(img, Image.Image):
+            pil_images.append(img)
+            continue
+        # Converting tensor to PIL Image
+        img_np = img.detach().cpu().numpy()  # mantieni shape originale, no squeeze
+
+        if img_np.ndim == 4:
+            img_np = img_np.squeeze(0)  # rimuovi SOLO batch dim → [C, H, W] o [1, H, W]
+
+        if img_np.ndim == 2 or img_np.shape[0] == 1:
+            # Grayscale: [H, W] o [1, H, W]
+            img_np = img_np.squeeze()
+            img_np = (img_np * 255).astype("uint8")
+            pil_images.append(Image.fromarray(img_np, mode="L"))
+        if img_np.shape[0] == 3:
+            img_np = img_np.transpose(1, 2, 0)  # [H, W, C]
+            # Da [-1, 1] → [0, 255]
+            img_np = ((img_np + 1) / 2 * 255).clip(0, 255).astype("uint8")
+            pil_images.append(Image.fromarray(img_np, mode="RGB"))
+        else:
+            raise ValueError(f"Unexpected shape: {img_np.shape}")
 
     if rubber_band and len(pil_images) > 2:
         pil_images += pil_images[2:-1][::-1]
