@@ -3,18 +3,22 @@ import numpy as np
 import torch
 
 from mnist_classifier.model_mnist import MnistClassifier
-from config import DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH
+from torchvision.models import vgg19_bn, VGG19_BN_Weights
+from config import DATASET, DEVICE, IMG_SIZE, CLASSIFIER_WEIGHTS_PATH
 
 
 class Predictor:
 
-    # MNIST classifier
-    # Load the model
-    classifier = MnistClassifier(img_size=IMG_SIZE).to(DEVICE)
-    classifier.load_state_dict(torch.load(CLASSIFIER_WEIGHTS_PATH, map_location=DEVICE))
-
-    # VGG19 pretrained on ImageNet
-    # classifier = torch.hub.load("pytorch/vision:v0.10.0", "vgg19_bn", pretrained=True).to(DEVICE)
+    if DATASET == "mnist":
+        # MNIST classifier
+        classifier = MnistClassifier(img_size=IMG_SIZE).to(DEVICE)
+        classifier.load_state_dict(torch.load(CLASSIFIER_WEIGHTS_PATH, map_location=DEVICE))
+    elif DATASET == "imagenet":
+        # VGG19 pretrained on ImageNet
+        weights = VGG19_BN_Weights.DEFAULT
+        classifier = vgg19_bn(weights=weights).to(DEVICE)
+    else:
+        raise ValueError("Unsupported dataset specified in config")
 
     classifier.eval()
     print("Loaded classifier")
@@ -28,7 +32,6 @@ class Predictor:
 
         # margin between expected and top logits
         label, confidence = confidence_margin(logits, exp_label)
-        # label, confidence = comparison_confidence_helper(logits, exp_label)
 
         return label, confidence
 

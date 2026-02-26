@@ -1,1 +1,2 @@
 SD_weights/Mnist_Lora_sdv1.5-000005.safetensors filter=lfs diff=lfs merge=lfs -text
+SD_weights/pizza_imgnet-000005.safetensors filter=lfs diff=lfs merge=lfs -text

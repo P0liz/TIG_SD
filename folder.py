@@ -2,7 +2,7 @@ from timer import Timer
 from datetime import datetime
 from os.path import exists, join
 from os import makedirs
-from config import ARCHIVE_TYPE, BUCKET_CONFIG
+from config import BUCKET_CONFIG
 
 
 class Folder:

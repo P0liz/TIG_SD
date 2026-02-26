@@ -220,9 +220,9 @@ class Archive:
                         "run",
                         "iteration",
                         "archive_len",
-                        "total_seeds",
-                        "covered_seeds",
-                        "final seeds",
+                        "total_labels",
+                        "covered_labels",
+                        "final_labels",
                         "members_dist_min",
                         "members_dist_max",
                         "members_dist_avg",
@@ -258,13 +258,13 @@ class Archive:
         out_diameter = None
         in_diameter = None
         stats = [None] * 4
-        final_seeds = []
+        final_labels = []
         if len(solution) > 0:
             # reference_filename = "ref_digit/cinque_rp.npy"
             # reference = np.load(reference_filename)
             out_diameter = get_diameter(outer_frontier)
             in_diameter = get_diameter(inner_frontier)
-            final_seeds = self.get_seeds()
+            final_labels = self.get_labels()
             stats = self.get_dist_members()
             # TODO: what for?
             # out_radius_ref = get_radius_reference(outer_frontier, reference)
@@ -318,7 +318,7 @@ class Archive:
                     str(n),
                     str(len(labels)),
                     str(len(self.archived_labels)),
-                    str(len(final_seeds)),
+                    str(len(final_labels)),
                     str(stats[0]),
                     str(stats[1]),
                     str(stats[2]),
@@ -384,11 +384,11 @@ class Archive:
             dst = join(Folder.DST, "labels_history.png")
             plot_labels(labels_history, dst)
 
-    def get_seeds(self):
-        seeds = set()
+    def get_labels(self):
+        labels = set()
         for ind in self.get_archive():
-            seeds.add(ind.prompt)
-        return seeds
+            labels.add(ind.m1.expected_label)
+        return labels
 
     def get_dist_members(self):
         distances = list()

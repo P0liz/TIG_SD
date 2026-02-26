@@ -4,7 +4,13 @@ from config import *
 
 # standard
 from diffusers import StableDiffusionPipeline
-from diffusers.schedulers import DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler
+from tgate import TgateSDDeepCacheLoader
+from diffusers.schedulers import (
+    DDIMScheduler,
+    DPMSolverMultistepScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+)
 
 # custom
 from transformers import CLIPTextModel, CLIPTokenizer
@@ -27,11 +33,13 @@ class SDPipelineManager:
             cls._instance = super(SDPipelineManager, cls).__new__(cls)
         return cls._instance
 
-    def initialize(self, mode="standard", num_inference_steps=15):
+    def initialize(self, mode="standard", num_inference_steps=NUM_INFERENCE_STEPS):
         """
         Initialize pipeline
         Args:
             mode: 'standard' (uses StableDiffusionPipeline) or 'custom' (loads components separately)
+            optimization: whether to use optimized inference steps (only for standard pipeline)
+            num_inference_steps: number of denoising steps to use
         """
         if self._initialized:
             if self._mode == mode:
@@ -41,6 +49,11 @@ class SDPipelineManager:
                 raise ValueError(f"Pipeline already initialized in {self._mode} mode, cannot switch to {mode}")
 
         print(f"Loading {mode} Stable Diffusion pipeline...")
+
+        if DATASET == "imagenet":
+            self.optimization = True
+        else:
+            self.optimization = False
 
         if mode == "standard":
             self._init_standard()
@@ -69,17 +82,20 @@ class SDPipelineManager:
         # Load LoRA weights
         self.pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
 
-        # Configure scheduler
-        if TRYNEW:
-            self.pipe.scheduler = EulerDiscreteScheduler.from_config(
-                self.pipe.scheduler.config, timestep_spacing="leading"
-            )
-        else:
-            self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config, rescale_betas_zero_snr=True)
+        # Inference speed optimization
+        if self.optimization:
+            self.pipe = TgateSDDeepCacheLoader(self.pipe, cache_interval=3, cache_branch_id=0).to(DEVICE)
+
+        # Configuring scheduler
+        self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config, rescale_betas_zero_snr=True)
+
+        # TODO: test with times
+        # self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config)
 
     # ------------------------------------------------------
     #   CUSTOM IMPLEMENTATION
     # ------------------------------------------------------
+    # No optimization for the custom pipeline
     vae = None
     tokenizer = None
     text_encoder = None

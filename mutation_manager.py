@@ -8,11 +8,21 @@ import random
 
 from torchvision import transforms
 from diffusion import pipeline_manager
-from config import DEVICE, DELTA, STANDING_STEP_LIMIT
+from config import DEVICE, DELTA, STANDING_STEP_LIMIT, DATASET
 
 # Local config
 CLAMP_MIN = -5.41362476348877
 CLAMP_MAX = 5.43081117630005
+
+# TODO: understand this
+transform = transforms.Compose(
+    [
+        transforms.Resize((256, 256)),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
+)
 
 
 def mutate(z_orig, perturbation_size, generator=None):
@@ -77,20 +87,37 @@ def generate(prompt, mutated_latent, guidance_scale=2.5, generator=None):
     """
     pipe = pipeline_manager.pipe
     with torch.inference_mode():
-        image = pipe(
-            prompt=prompt,
-            guidance_scale=guidance_scale,
-            num_inference_steps=pipeline_manager.num_inference_steps,
-            latents=mutated_latent,
-            generator=generator,
-        )["images"][0]
+        if pipeline_manager.optimization:
+            image = pipe.tgate(
+                prompt=prompt,
+                guidance_scale=guidance_scale,
+                gate_step=10,
+                num_inference_steps=pipeline_manager.num_inference_steps,
+                latents=mutated_latent,
+                generator=generator,
+            )["images"]
+        else:
+            image = pipe(
+                prompt=prompt,
+                guidance_scale=guidance_scale,
+                num_inference_steps=pipeline_manager.num_inference_steps,
+                latents=mutated_latent,
+                generator=generator,
+            )["images"][0]
 
-    # preprocess image to 28x28 grayscale tensor
-    image_tensor = process_image(image).unsqueeze(0).to(DEVICE)  # Add batch dimension and move to device
+    if DATASET == "mnist":
+        # preprocess image to 28x28 grayscale tensor
+        image_tensor = process_mnist_image(image).unsqueeze(0).to(DEVICE)  # Add batch dimension and move to device
+    elif DATASET == "imagenet":
+        # preprocess image to 224x224 RGB tensor
+        image_tensor = transform(image)
+        image_tensor = image_tensor.unsqueeze(0).to(DEVICE)
+    else:
+        raise ValueError("Unsupported dataset specified in config")
     return mutated_latent, image_tensor, image
 
 
-def process_image(image):
+def process_mnist_image(image):
     """
     Convert a 3-channel RGB PIL Image to grayscale, resize it to 28x28 pixels,
     and convert it to a PyTorch tensor.

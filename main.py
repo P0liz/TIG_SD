@@ -6,7 +6,7 @@ from deap import base, creator, tools
 from deap.tools.emo import selNSGA2
 
 from mnist_member import MnistMember
-from digit_mutator import DigitMutator
+from member_mutator import MemberMutator
 from predictor import Predictor
 import archive_manager
 import utils
@@ -33,7 +33,7 @@ class GeneticAlgorithm:
     # Generation
     # ========================================================================
 
-    def generate_member(self, expected_label, guidance_scale=3.5, max_attempts=10):
+    def generate_member(self, prompt, expected_label, guidance_scale=3.5, max_attempts=10):
         """
         Generate a member with Stable Diffusion and Validate it if possible
         Starting with higher guidance_scale to get more realistic outputs
@@ -54,7 +54,7 @@ class GeneticAlgorithm:
             )
             # Generate member and classify it
             member = MnistMember(og_latent, expected_label)
-            DigitMutator(member).generate(guidance_scale=guidance_scale)
+            MemberMutator(prompt, member).generate(guidance_scale=guidance_scale)
             prediction, confidence = Predictor.predict_single(member, expected_label)
 
             # Validation
@@ -70,7 +70,7 @@ class GeneticAlgorithm:
         print(f"Failed to generate valid member for label {expected_label}")
         return None
 
-    def create_individual(self, label=None):
+    def create_individual(self, prompt, label=None):
         """
         Args:
             label (_type_, optional): _description_. Defaults to None.
@@ -84,13 +84,15 @@ class GeneticAlgorithm:
 
         if label is None:
             label = random.randint(0, 9)
-        prompt = PROMPTS[label]
+        # Override label if specified in config
+        if DATASET == "imagenet":
+            label = IMAGENET_LABEL
 
         # Generate members
-        m1 = self.generate_member(label)
+        m1 = self.generate_member(prompt, label)
         if m1 is None:
             # Riprova con guidance più alta
-            m1 = self.generate_member(label, guidance_scale=4.5)
+            m1 = self.generate_member(prompt, label, guidance_scale=4.5)
             if m1 is None:
                 raise ValueError(f"Cannot create individual for label {label}")
 
@@ -157,7 +159,7 @@ class GeneticAlgorithm:
             other_member = individual.m1
 
         # Mutate
-        mutator = DigitMutator(member_to_mutate)
+        mutator = MemberMutator(individual.prompt, member_to_mutate)
         mutator.initial_mutation()  # Mutate latent
         mutator.generate()  # Generate new image
         individual.reset()  # reset fitness-related fields
@@ -251,6 +253,7 @@ class GeneticAlgorithm:
         new_ind.members_latent_cos_sims = list(individual.members_latent_cos_sims)
         return new_ind
 
+    # TODO: understand reseeding for imagenet, is it needed?
     def reseed_population(self, population, n_reseed):
         """
         Reseed n_reseed individuals in the population to promote diversity

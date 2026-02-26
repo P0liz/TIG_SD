@@ -7,7 +7,7 @@ from timer import Timer
 from folder import Folder
 from individual import Individual
 from predictor import Predictor
-from digit_mutator import DigitMutator
+from member_mutator import MemberMutator
 from mnist_member import MnistMember
 from diffusion import pipeline_manager
 from data_visualization import export_as_gif, plot_distance
@@ -19,7 +19,7 @@ MODE = "standard"  # Or "custom"
 SEED = random.randint(0, 2**32 - 1)
 
 
-def mutate_rand_digit(m1: "DigitMutator", m2: "DigitMutator", images1, images2, generator=None):
+def mutate_rand_digit(m1: "MemberMutator", m2: "MemberMutator", images1, images2, generator=None):
     # Scegli membro casuale
     if random.getrandbits(1):
         selected_m = m1
@@ -39,21 +39,21 @@ def mutate_rand_digit(m1: "DigitMutator", m2: "DigitMutator", images1, images2, 
         raise ValueError("Unknown mode")
 
     if is1:
-        images1.append(selected_m.digit.image_tensor)
+        images1.append(selected_m.member.image_tensor)
     else:
-        images2.append(selected_m.digit.image_tensor)
+        images2.append(selected_m.member.image_tensor)
 
     # Predici
-    prediction, confidence = Predictor.predict_single(selected_m.digit, selected_m.digit.expected_label)
-    selected_m.digit.confidence_history.append(confidence)
+    prediction, confidence = Predictor.predict_single(selected_m.member, selected_m.member.expected_label)
+    selected_m.member.confidence_history.append(confidence)
 
     # If confidence diff is too low and the or confidence is higher then...
-    if abs(confidence - selected_m.digit.confidence) <= CONF_CHANGE or confidence >= selected_m.digit.confidence:
-        selected_m.digit.standing_steps += 1
+    if abs(confidence - selected_m.member.confidence) <= CONF_CHANGE or confidence >= selected_m.member.confidence:
+        selected_m.member.standing_steps += 1
     else:
-        selected_m.digit.standing_steps = 0
+        selected_m.member.standing_steps = 0
 
-    return prediction, confidence, selected_m.digit, other_m.digit
+    return prediction, confidence, selected_m.member, other_m.member
 
 
 def main(prompt, expected_label, max_steps=NGEN):
@@ -84,7 +84,7 @@ def main(prompt, expected_label, max_steps=NGEN):
 
         # Initial generation and validation
         # Higher guidance_scale to assure the prompt is followed correctly
-        mutator1 = DigitMutator(digit1)
+        mutator1 = MemberMutator(prompt, digit1)
         if MODE == "custom":
             mutator1.denoise_and_decode(isMutating=False, guidance_scale=3.5, generator=generator)
         elif MODE == "standard":
@@ -112,7 +112,7 @@ def main(prompt, expected_label, max_steps=NGEN):
 
     # second member of an Individual
     mutator2 = mutator1.clone()
-    digit2 = mutator2.digit
+    digit2 = mutator2.member
 
     print(f"[000] " f"exp={digit1.expected_label} " f"conf={digit1.confidence:.3f}")
 
@@ -149,7 +149,8 @@ def main(prompt, expected_label, max_steps=NGEN):
         euc_img_dists.append(img_euc_dist)
 
         elapsed = Timer.get_elapsed_time()
-        iteration_times.append(elapsed)
+        elapsed_seconds = elapsed.total_seconds()
+        iteration_times.append(elapsed_seconds)
         print(
             f"[{step:03d}] "
             f"pred={selected_digit.predicted_label} "
@@ -157,7 +158,7 @@ def main(prompt, expected_label, max_steps=NGEN):
             f"cos_sim={cos_sim:.3f} "
             f"euc_dist={euc_dist:.3f} "
             f"euc_img_dist={img_euc_dist:.3f} "
-            f"time={elapsed:.2f}s"
+            f"time={elapsed_seconds}s"
         )
 
         if not selected_digit.correctly_classified:
@@ -170,9 +171,9 @@ def main(prompt, expected_label, max_steps=NGEN):
 
     # Timing stats
     print(f"\nTiming stats:")
-    print(f"  Total time: {sum(iteration_times):.2f}s")
-    print(f"  Avg per iteration: {sum(iteration_times)/len(iteration_times):.2f}s")
-    print(f"  Min: {min(iteration_times):.2f}s, Max: {max(iteration_times):.2f}s")
+    print(f"  Total time: {sum(iteration_times)}s")
+    print(f"  Avg per iteration: {sum(iteration_times)/len(iteration_times)}s")
+    print(f"  Min: {min(iteration_times)}s, Max: {max(iteration_times)}s")
 
     ind = Individual(digit1, digit2, prompt, None)  # Create final individual to see results
     ind.misstep = step
@@ -199,10 +200,15 @@ if __name__ == "__main__":
     Timer.initialize()
     random.seed(SEED)
     randprompt = random.choice(PROMPTS)
-    expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
+    if DATASET == "mnist":
+        expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
+    elif DATASET == "imagenet":
+        expected_label = IMAGENET_LABEL
+    else:
+        raise ValueError("Unsupported dataset specified in config")
+
     main(prompt=randprompt, expected_label=expected_label)
     print("GAME OVER")
-    config.TRYNEW = not config.TRYNEW
 
 
 # source ./venv/bin/activate

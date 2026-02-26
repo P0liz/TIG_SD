@@ -4,13 +4,14 @@ from os import makedirs
 from os.path import join
 
 import numpy as np
+from PIL import Image
 from numpy import mean
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import evaluator
 from folder import Folder
 from data_visualization import plot_confidence, plot_distance
-from config import DISTANCE_METRIC
+from config import DATASET, DISTANCE_METRIC
 
 
 class Individual:
@@ -87,12 +88,18 @@ class Individual:
             latent_path = join(ind_dir, f"m{idx}_latent.npy")
             image_path = join(ind_dir, f"m{idx}_image.npy")
 
-            img_np = member.image_tensor.detach().cpu().numpy().squeeze()
             lat_np = member.latent.detach().cpu().numpy().squeeze()
 
             # Save image (visual)
-            # Rememeber to save image from the preprocessed tensor (already 28x28 grayscale)
-            plt.imsave(png_path, img_np, cmap=cm.gray, format="png", vmin=0, vmax=1)
+            if DATASET == "mnist":
+                # Rememeber to save image from the preprocessed tensor (already 28x28 grayscale)
+                img_np = member.image_tensor.detach().cpu().numpy().squeeze()
+                plt.imsave(png_path, img_np, cmap=cm.gray, format="png", vmin=0, vmax=1)
+            elif DATASET == "imagenet":
+                img_np = save_imagenet_image_np(member, png_path)
+                member.image.save(png_path)  # PIL save
+            else:
+                raise ValueError("Unsupported dataset specified in config")
 
             # Save latent and image as .npy files (raw tensors)
             np.save(latent_path, lat_np)
@@ -161,3 +168,24 @@ class Individual:
 
         dist = mean([min(a, b), min(c, d), min(a, c), min(b, d)])
         return dist
+
+
+def save_imagenet_image_np(member, png_path):
+    img = member.image_tensor.detach().cpu()
+    # Rimuovi batch se presente
+    if img.ndim == 4:
+        img = img[0]
+    # Se formato CHW → converti a HWC
+    if img.shape[0] == 3:
+        img = img.permute(1, 2, 0)
+    img_np = img.numpy()
+    """
+    # Denormalizza ImageNet
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+
+    img_np = img_np * std + mean
+    img_np = np.clip(img_np, 0, 1)
+    plt.imsave(png_path, img_np, vmin=0, vmax=1)
+    """
+    return img_np

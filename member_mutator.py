@@ -1,23 +1,22 @@
 # %%writefile digit_mutator.py
-from math import exp
 import mutation_manager
-from config import PROMPTS, DEVICE
+from config import DEVICE
 from mnist_member import MnistMember
 import torch
 from diffusion import pipeline_manager
 
 
-class DigitMutator:
+class MemberMutator:
 
-    def __init__(self, digit, num_inference_steps=15, mutation_step=4):
-        self.digit: "MnistMember" = digit
-        self.initial_latent = digit.og_latent
-        self.inference_steps = num_inference_steps  # total numebr of steps
+    def __init__(self, prompt, member, mutation_step=4):
+        self.prompt = prompt
+        self.member: "MnistMember" = member
+        self.initial_latent = member.og_latent
         self.mutation_step = mutation_step  # Step to cache
         self.cached_latent = None
 
         if pipeline_manager._mode == "custom":
-            self.text_embeddings = pipeline_manager.text_embeddings([PROMPTS[self.digit.expected_label]])
+            self.text_embeddings = pipeline_manager.text_embeddings(self.prompt)
             # First pass: denoise until mutation_step is reached, then cache it
             self.cache_denoising_steps()
 
@@ -49,9 +48,9 @@ class DigitMutator:
                 break
 
     def clone(self):
-        """Clone the mutator with a new digit instance but shared cache"""
-        cloned_digit = self.digit.clone()
-        cloned_mutator = DigitMutator(cloned_digit, self.inference_steps, self.mutation_step)
+        """Clone the mutator with a new member instance but shared cache"""
+        cloned_member = self.member.clone()
+        cloned_mutator = MemberMutator(self.prompt, cloned_member, self.mutation_step)
 
         # Shared cache between original and clone
         if pipeline_manager._mode == "custom":
@@ -69,10 +68,10 @@ class DigitMutator:
         # Latent walk on cached vector
         if isMutating:
             # Mutate the cached latent vector
-            perturbation_size = mutation_manager.calculate_perturbation_size(self.digit.standing_steps)
+            perturbation_size = mutation_manager.calculate_perturbation_size(self.member.standing_steps)
             self.cached_latent = mutation_manager.mutate(self.cached_latent, perturbation_size, generator)
             # Reset prediction status to trigger re-evaluation
-            self.digit.reset()
+            self.member.reset()
         latent = self.cached_latent.clone()
         print(f"Latent stats - min: {latent.min():.2f}, max: {latent.max():.2f}, std: {latent.std():.2f}")
 
@@ -93,26 +92,25 @@ class DigitMutator:
         return latent
 
     def initial_mutation(self, generator=None):
-        perturbation_size = mutation_manager.calculate_perturbation_size(self.digit.standing_steps)
+        perturbation_size = mutation_manager.calculate_perturbation_size(self.member.standing_steps)
 
         # Latent mutation
-        mutated_latent = mutation_manager.mutate(self.digit.latent, perturbation_size, generator)
+        mutated_latent = mutation_manager.mutate(self.member.latent, perturbation_size, generator)
         print(
             f"Latent stats - min: {mutated_latent.min():.2f}, max: {mutated_latent.max():.2f}, std: {mutated_latent.std():.2f}"
         )
         # Update state
-        self.digit.latent = mutated_latent
+        self.member.latent = mutated_latent
         # Reset prediction status to trigger re-evaluation
-        self.digit.reset()
+        self.member.reset()
 
     def generate(self, guidance_scale=2.5, generator=None):
         assert pipeline_manager._mode == "standard", "generate() only works in standard mode"
-        prompt = PROMPTS[self.digit.expected_label]
-        _, mutated_tensor, image = mutation_manager.generate(prompt, self.digit.latent, guidance_scale, generator)
 
+        _, mutated_tensor, image = mutation_manager.generate(self.prompt, self.member.latent, guidance_scale, generator)
         # Update state
-        self.digit.image_tensor = mutated_tensor
-        self.digit.image = image
+        self.member.image_tensor = mutated_tensor
+        self.member.image = image
 
     def denoise_and_decode(self, isMutating=True, guidance_scale=2.5, generator=None):
         assert pipeline_manager._mode == "custom", "denoise_decode() only works in custom mode"
@@ -127,6 +125,6 @@ class DigitMutator:
         image_tensor = mutation_manager.process_image(image).unsqueeze(0).to(DEVICE)
 
         # Update state
-        self.digit.image = image
-        self.digit.latent = latent
-        self.digit.image_tensor = image_tensor
+        self.member.image = image
+        self.member.latent = latent
+        self.member.image_tensor = image_tensor
