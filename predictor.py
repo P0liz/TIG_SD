@@ -25,7 +25,8 @@ class Predictor:
 
     def predict_single(member, exp_label):
         with torch.no_grad():
-            logits = Predictor.classifier(member.image_tensor).squeeze().cpu().numpy()
+            # unsqueeze to add batch dimension needed by classifier
+            logits = Predictor.classifier(member.image_tensor.unsqueeze(0)).squeeze().cpu().numpy()
 
         # Margin between the 2 top logits as confidence score
         # label, confidence = simple_confidence_margin(logits)
@@ -36,7 +37,8 @@ class Predictor:
         return label, confidence
 
     def predict(members, exp_labels):
-        batch_tensors = torch.stack([member.image_tensor.squeeze(0) for member in members]).to(DEVICE)
+        # Creating batch tensor for all members (batch size, channels, height, width)
+        batch_tensors = torch.stack([member.image_tensor for member in members]).to(DEVICE)
 
         with torch.no_grad():
             batch_logits = Predictor.classifier(batch_tensors).cpu().numpy()

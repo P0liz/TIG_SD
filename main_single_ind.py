@@ -39,21 +39,21 @@ def mutate_rand_digit(m1: "MemberMutator", m2: "MemberMutator", images1, images2
         raise ValueError("Unknown mode")
 
     if is1:
-        images1.append(selected_m.member.image_tensor)
+        images1.append(selected_m.members.image_tensor)
     else:
-        images2.append(selected_m.member.image_tensor)
+        images2.append(selected_m.members.image_tensor)
 
     # Predici
-    prediction, confidence = Predictor.predict_single(selected_m.member, selected_m.member.expected_label)
-    selected_m.member.confidence_history.append(confidence)
+    prediction, confidence = Predictor.predict_single(selected_m.members, selected_m.members.expected_label)
+    selected_m.members.confidence_history.append(confidence)
 
     # If confidence diff is too low and the or confidence is higher then...
-    if abs(confidence - selected_m.member.confidence) <= CONF_CHANGE or confidence >= selected_m.member.confidence:
-        selected_m.member.standing_steps += 1
+    if abs(confidence - selected_m.members.confidence) <= CONF_CHANGE or confidence >= selected_m.members.confidence:
+        selected_m.members.standing_steps += 1
     else:
-        selected_m.member.standing_steps = 0
+        selected_m.members.standing_steps = 0
 
-    return prediction, confidence, selected_m.member, other_m.member
+    return prediction, confidence, selected_m.members, other_m.members
 
 
 def main(prompt, expected_label, max_steps=NGEN):
@@ -112,7 +112,7 @@ def main(prompt, expected_label, max_steps=NGEN):
 
     # second member of an Individual
     mutator2 = mutator1.clone()
-    digit2 = mutator2.member
+    digit2 = mutator2.members
 
     print(f"[000] " f"exp={digit1.expected_label} " f"conf={digit1.confidence:.3f}")
 

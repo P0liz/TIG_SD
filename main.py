@@ -71,17 +71,6 @@ class GeneticAlgorithm:
         return None
 
     def create_individual(self, prompt, label=None):
-        """
-        Args:
-            label (_type_, optional): _description_. Defaults to None.
-
-        Raises:
-            ValueError: _description_
-
-        Returns:
-            new basic individual, composed a couple of members
-        """
-
         if label is None:
             label = random.randint(0, 9)
         # Override label if specified in config
@@ -143,31 +132,34 @@ class GeneticAlgorithm:
     # ========================================================================
     # Mutation
     # ========================================================================
-    def mutate_individual(self, individual: "Individual"):
-        """
-        Mutate a single digit chosen randomly and keep the mutation either way it goes
-        Keep track of standing steps to increase mutation size if needed
-        Args:
-            individual (_type_): _description_
-        """
-        # Chose random member
-        if random.getrandbits(1):
-            member_to_mutate = individual.m1
-            other_member = individual.m2
-        else:
-            member_to_mutate = individual.m2
-            other_member = individual.m1
+    def mutate_individuals(self, individuals: list["Individual"]):
+        # Batch mutation for all individuals in the population
+        members_to_mutate: list[MnistMember] = []
+        other_members: list[MnistMember] = []
+        prompts = []
+        for ind in individuals:
+            # Chose random member
+            if random.getrandbits(1):
+                members_to_mutate.append(ind.m1)
+                other_members.append(ind.m2)
+            else:
+                members_to_mutate.append(ind.m2)
+                other_members.append(ind.m1)
+            prompts.append(ind.prompt)
 
         # Mutate
-        mutator = MemberMutator(individual.prompt, member_to_mutate)
+        mutator = MemberMutator(prompts, members_to_mutate)
         mutator.initial_mutation()  # Mutate latent
         mutator.generate()  # Generate new image
-        individual.reset()  # reset fitness-related fields
 
-        # Update distances
-        individual.members_distance = utils.get_distance(member_to_mutate, other_member, "latent_euclidean")
-        individual.members_img_euc_dist = utils.get_distance(member_to_mutate, other_member, "image_euclidean")
-        individual.members_latent_cos_sim = utils.get_distance(member_to_mutate, other_member, "latent_cosine")
+        for i, ind in enumerate(individuals):
+            # Update distances
+            ind.members_distance = utils.get_distance(members_to_mutate[i], other_members[i], "latent_euclidean")
+            ind.members_img_euc_dist = utils.get_distance(members_to_mutate[i], other_members[i], "image_euclidean")
+            ind.members_latent_cos_sim = utils.get_distance(members_to_mutate[i], other_members[i], "latent_cosine")
+            # reset fitness-related fields
+            ind.reset()
+            del ind.fitness.values
 
     # ========================================================================
     # Evaluation
@@ -188,8 +180,8 @@ class GeneticAlgorithm:
                 members_to_predict.append(ind.m2)
         if len(members_to_predict) == 0:
             return
-        batch_labels = [m.expected_label for m in members_to_predict]
 
+        batch_labels = [m.expected_label for m in members_to_predict]
         predictions, confidences = Predictor.predict(members_to_predict, batch_labels)
 
         # Assign results
@@ -386,10 +378,7 @@ class GeneticAlgorithm:
 
             # 3. Mutation
             print(f"Mutating {len(offspring)} offspring...")
-            for i, ind in enumerate(offspring):
-                print(f"[{i+1}/{len(offspring)}]")
-                self.mutate_individual(ind)
-                del ind.fitness.values
+            self.mutate_individuals(offspring)
 
             # 4. Evaluation
             all_individuals = population + offspring

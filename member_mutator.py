@@ -8,15 +8,17 @@ from diffusion import pipeline_manager
 
 class MemberMutator:
 
-    def __init__(self, prompt, member, mutation_step=4):
-        self.prompt = prompt
-        self.member: "MnistMember" = member
-        self.initial_latent = member.og_latent
-        self.mutation_step = mutation_step  # Step to cache
-        self.cached_latent = None
+    def __init__(self, prompts, members, mutation_step=4):
+        self.prompts = prompts
+        self.members: list[MnistMember] = members
 
+        # Custom mode caching setup
         if pipeline_manager._mode == "custom":
-            self.text_embeddings = pipeline_manager.text_embeddings(self.prompt)
+            assert len(self.members) == 1, "Custom mode only supports single member mutation"
+            self.initial_latent = self.members[0].og_latent
+            self.mutation_step = mutation_step  # Step to cache
+            self.cached_latent = None
+            self.text_embeddings = pipeline_manager.text_embeddings(self.prompts)
             # First pass: denoise until mutation_step is reached, then cache it
             self.cache_denoising_steps()
 
@@ -49,8 +51,8 @@ class MemberMutator:
 
     def clone(self):
         """Clone the mutator with a new member instance but shared cache"""
-        cloned_member = self.member.clone()
-        cloned_mutator = MemberMutator(self.prompt, cloned_member, self.mutation_step)
+        cloned_members = [member.clone() for member in self.members]
+        cloned_mutator = MemberMutator(self.prompts, cloned_members, self.mutation_step)
 
         # Shared cache between original and clone
         if pipeline_manager._mode == "custom":
@@ -68,10 +70,10 @@ class MemberMutator:
         # Latent walk on cached vector
         if isMutating:
             # Mutate the cached latent vector
-            perturbation_size = mutation_manager.calculate_perturbation_size(self.member.standing_steps)
+            perturbation_size = mutation_manager.calculate_perturbation_size(self.members[0].standing_steps)
             self.cached_latent = mutation_manager.mutate(self.cached_latent, perturbation_size, generator)
             # Reset prediction status to trigger re-evaluation
-            self.member.reset()
+            self.members[0].reset()
         latent = self.cached_latent.clone()
         print(f"Latent stats - min: {latent.min():.2f}, max: {latent.max():.2f}, std: {latent.std():.2f}")
 
@@ -92,25 +94,28 @@ class MemberMutator:
         return latent
 
     def initial_mutation(self, generator=None):
-        perturbation_size = mutation_manager.calculate_perturbation_size(self.member.standing_steps)
+        for member in self.members:
+            perturbation_size = mutation_manager.calculate_perturbation_size(member.standing_steps)
 
-        # Latent mutation
-        mutated_latent = mutation_manager.mutate(self.member.latent, perturbation_size, generator)
-        print(
-            f"Latent stats - min: {mutated_latent.min():.2f}, max: {mutated_latent.max():.2f}, std: {mutated_latent.std():.2f}"
-        )
-        # Update state
-        self.member.latent = mutated_latent
-        # Reset prediction status to trigger re-evaluation
-        self.member.reset()
+            # Latent mutation
+            mutated_latent = mutation_manager.mutate(member.latent, perturbation_size, generator)
+            print(
+                f"Latent stats - min: {mutated_latent.min():.2f}, max: {mutated_latent.max():.2f}, std: {mutated_latent.std():.2f}"
+            )
+            # Update state
+            member.latent = mutated_latent
+            # Reset prediction status to trigger re-evaluation
+            member.reset()
 
     def generate(self, guidance_scale=2.5, generator=None):
         assert pipeline_manager._mode == "standard", "generate() only works in standard mode"
 
-        _, mutated_tensor, image = mutation_manager.generate(self.prompt, self.member.latent, guidance_scale, generator)
+        latents = [member.latent for member in self.members]
+        mutated_tensors, images = mutation_manager.generate(self.prompts, latents, guidance_scale, generator)
         # Update state
-        self.member.image_tensor = mutated_tensor
-        self.member.image = image
+        for i, member in enumerate(self.members):
+            member.image_tensor = mutated_tensors[i]
+            member.image = images[i]
 
     def denoise_and_decode(self, isMutating=True, guidance_scale=2.5, generator=None):
         assert pipeline_manager._mode == "custom", "denoise_decode() only works in custom mode"
@@ -122,9 +127,9 @@ class MemberMutator:
 
         # preprocess image to 28x28 grayscale tensor
         # Add batch dimension and move to device
-        image_tensor = mutation_manager.process_image(image).unsqueeze(0).to(DEVICE)
+        image_tensor = mutation_manager.process_image(image).to(DEVICE)
 
         # Update state
-        self.member.image = image
-        self.member.latent = latent
-        self.member.image_tensor = image_tensor
+        self.members[0].image = image
+        self.members[0].latent = latent
+        self.members[0].image_tensor = image_tensor

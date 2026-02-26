@@ -148,13 +148,13 @@ class SDPipelineManager:
         )
         """
 
-    def text_embeddings(self, prompt):
-        if isinstance(prompt, str):
-            prompt = [prompt]  # prompt must be a list
-        BATCH_SIZE = len(prompt)
-        # Generate embeddings for the prompt
+    def text_embeddings(self, prompts):
+        if isinstance(prompts, str):
+            prompts = [prompts]  # prompt must be a list
+        BATCH_SIZE = len(prompts)
+        # Generate embeddings for the prompts
         text_input = self.tokenizer(
-            prompt,
+            prompts,
             padding="max_length",
             max_length=self.tokenizer.model_max_length,
             truncation=True,
@@ -168,7 +168,8 @@ class SDPipelineManager:
         uncond_input = self.tokenizer(
             [""] * BATCH_SIZE, padding="max_length", max_length=max_length, return_tensors="pt"
         )
-        uncond_embeddings = self.text_encoder(uncond_input.input_ids.to(DEVICE))[0]
+        with torch.no_grad():
+            uncond_embeddings = self.text_encoder(uncond_input.input_ids.to(DEVICE))[0]
         # Concatenate the unconditional and conditional embeddings
         text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
         return text_embeddings

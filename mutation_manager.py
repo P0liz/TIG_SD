@@ -72,49 +72,42 @@ def apply_mutation_op1(org_latent, device=DEVICE):
     return mutated_latent
 
 
-def generate(prompt, mutated_latent, guidance_scale=2.5, generator=None):
-    """
-    Genera un'immagine usando Stable Diffusion
-
-    Args:
-        prompt: str - prompt testuale
-        mutated_latent: torch.Tensor - latent code (opzionale)
-
-    Returns:
-        mutated_latent: torch.Tensor - latent usato
-        image_tensor: torch.Tensor - immagine preprocessata [1, 1, 28, 28]
-        image: PIL.Image - visual image
-    """
+def generate(prompts, mutated_latents, guidance_scale=2.5, generator=None):
+    # Using batch generation to speed up the process, since the pipeline can handle multiple latents at once
     pipe = pipeline_manager.pipe
+
     with torch.inference_mode():
         if pipeline_manager.optimization:
-            image = pipe.tgate(
-                prompt=prompt,
+            images = pipe.tgate(
+                prompt=prompts,
                 guidance_scale=guidance_scale,
                 gate_step=10,
                 num_inference_steps=pipeline_manager.num_inference_steps,
-                latents=mutated_latent,
+                latents=mutated_latents,
                 generator=generator,
             )["images"]
         else:
-            image = pipe(
-                prompt=prompt,
+            images = pipe(
+                prompt=prompts,
                 guidance_scale=guidance_scale,
                 num_inference_steps=pipeline_manager.num_inference_steps,
-                latents=mutated_latent,
+                latents=mutated_latents,
                 generator=generator,
-            )["images"][0]
+            )["images"]
+    torch.cuda.empty_cache()
 
+    image_tensors = []
     if DATASET == "mnist":
         # preprocess image to 28x28 grayscale tensor
-        image_tensor = process_mnist_image(image).unsqueeze(0).to(DEVICE)  # Add batch dimension and move to device
+        for image in images:
+            image_tensors.append(process_mnist_image(image).to(DEVICE))
     elif DATASET == "imagenet":
         # preprocess image to 224x224 RGB tensor
-        image_tensor = transform(image)
-        image_tensor = image_tensor.unsqueeze(0).to(DEVICE)
+        for image in images:
+            image_tensors.append(transform(image).to(DEVICE))
     else:
         raise ValueError("Unsupported dataset specified in config")
-    return mutated_latent, image_tensor, image
+    return image_tensors, images
 
 
 def process_mnist_image(image):
