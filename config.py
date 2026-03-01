@@ -8,7 +8,7 @@ DJ_DEBUG = True  # If True, creates detailed debug reports
 SHORT_GEN = True
 
 # Dataset
-DATASET = "imagenet"  # Or "mnist"
+DATASET = "mnist"  # Or "imagenet"
 
 # Popolazione e generazioni
 if SHORT_GEN:
@@ -54,11 +54,12 @@ MODEL_ID_PATH = "runwayml/stable-diffusion-v1-5"
 HEIGHT = 512
 WIDTH = 512
 LORA_PATH = "./SD_weights"
-# LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
 if DATASET == "mnist":
+    # LORA_PATH = "/kaggle/input/mnist-lora-sd-weights"  # Path for Kaggle
     LORA_WEIGHTS = "Mnist_Lora_sdv1.5-000005.safetensors"
     NUM_INFERENCE_STEPS = 15
 elif DATASET == "imagenet":
+    # LORA_PATH = "/kaggle/input/datasets/gabrielepolizzotto/imagenet-pizza-lora-weights"  # Path for Kaggle
     LORA_WEIGHTS = "pizza_imgnet-000005.safetensors"
     NUM_INFERENCE_STEPS = 25
 DELTA = 0.025  # affects perturbation size for mutation
@@ -91,8 +92,8 @@ if DATASET == "mnist":
         "A photo of Nine9 Number9",
     ]
 elif DATASET == "imagenet":
-    PROMPTS = ["A photo of 1pizza pizza_slice"]
-    # PROMPTS = ["A photo of 1pizza"]
+    # PROMPTS = ["A photo of 1pizza pizza_slice"]
+    PROMPTS = ["A photo of 1pizza"]
     IMAGENET_LABEL = 963  # OR change 850 for teddy class
 
 # Diversity analysis

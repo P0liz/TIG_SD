@@ -21,7 +21,7 @@ def export_as_gif(filename, images, frames_per_second=5, rubber_band=False):
     pil_images = []
     for img in images:
         # Skip conversion if it's already a PIL Image
-        print(type(img), img.shape if hasattr(img, "shape") else "no shape")
+        # print(type(img), img.shape if hasattr(img, "shape") else "no shape")
         if isinstance(img, Image.Image):
             pil_images.append(img)
             continue

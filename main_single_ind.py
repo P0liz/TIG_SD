@@ -129,7 +129,7 @@ def main(prompt, expected_label, max_steps=NGEN):
     latent_cos_sims.append(0)
 
     # Iterative mutation process
-    iteration_times = []
+    iteration_times = [0]
     for step in range(1, max_steps + 1):
 
         # Mutation
@@ -152,7 +152,7 @@ def main(prompt, expected_label, max_steps=NGEN):
         euc_img_dists.append(img_euc_dist)
 
         elapsed = Timer.get_elapsed_time()
-        elapsed_seconds = elapsed.total_seconds()
+        elapsed_seconds = elapsed.total_seconds() - iteration_times[-1]  # Time for this iteration
         iteration_times.append(elapsed_seconds)
         print(
             f"[{step:03d}] "
@@ -199,19 +199,21 @@ def main(prompt, expected_label, max_steps=NGEN):
 if __name__ == "__main__":
     import config
 
-    Folder.initialize()
-    Timer.initialize()
-    random.seed(SEED)
-    randprompt = random.choice(PROMPTS)
-    if DATASET == "mnist":
-        expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
-    elif DATASET == "imagenet":
-        expected_label = IMAGENET_LABEL
-    else:
-        raise ValueError("Unsupported dataset specified in config")
+    for i in range(0, 2):
+        Folder.initialize()
+        Timer.initialize()
+        random.seed(SEED)
+        randprompt = random.choice(PROMPTS)
+        if DATASET == "mnist":
+            expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
+        elif DATASET == "imagenet":
+            expected_label = IMAGENET_LABEL
+        else:
+            raise ValueError("Unsupported dataset specified in config")
 
-    main(prompt=randprompt, expected_label=expected_label)
-    print("GAME OVER")
+        main(prompt=randprompt, expected_label=expected_label)
+        print("GAME OVER")
+        config.TRYNEW = not config.TRYNEW
 
 
 # source ./venv/bin/activate

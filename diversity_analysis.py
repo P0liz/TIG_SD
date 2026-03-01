@@ -520,27 +520,6 @@ def compute_all_single_runs():
         idx = idx + 1
         print(f"\n=== PROCESSING RUN {idx}/{len(all_run_folders)}: {Path(focus_run).name} ===")
 
-        """
-        # Prepara config per questa iterazione
-        # Focus: questa run
-        # Others: TUTTE le run (di tutti gli archivi)
-        temp_methods = {FOCUS_NAME: focus_run, OTHERS_NAME: all_run_folders}
-
-        # Carica dati
-        inds_data = []
-        method_names = []
-
-        for method_name, folder_pattern in temp_methods.items():
-            # Exclude focus run from "others"
-            exclude_path = focus_run if method_name != "focus" else None
-            individuals, _, _, _ = load_archived_individuals(folder_pattern, method_name, exclude_path)
-            inds_data.extend(individuals)
-            if len(individuals) > 0:
-                method_names.append(method_name)
-
-        # Compute custom distance matrix
-        distance_matrix = compute_individual_distance_matrix(inds_data)
-        """
         # Trova gli indici nella matrice globale
         focus_indices = [i for i, p in enumerate(global_paths) if p == focus_run]
         others_indices = [i for i, p in enumerate(global_paths) if p != focus_run]
@@ -660,10 +639,12 @@ def single_run_main():
 
         all_results[archive_name] = {
             "num_runs": len(both_coverages),
-            "num_individuals": num_individuals,
-            "avg_inds": avg_inds,
-            "std_inds": std_inds,
-            "avg -/+ std": (avg_inds - std_inds, avg_inds + std_inds),
+            "total_individuals": num_individuals,
+            "inds_stats": {
+                "average": avg_inds,
+                "std": std_inds,
+                "avg -/+ std inds": (avg_inds - std_inds, avg_inds + std_inds),
+            },
             "coverages_weighted": coverages_weighted,
             "coverages_unweighted": coverages_unweighted,
             "weighted": {"average": avg_w, "std": std_w, "min": min_cov_w, "max": max_cov_w, "median": median_w},

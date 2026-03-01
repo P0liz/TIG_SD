@@ -5,12 +5,7 @@ from config import *
 # standard
 from diffusers import StableDiffusionPipeline
 from tgate import TgateSDDeepCacheLoader
-from diffusers.schedulers import (
-    DDIMScheduler,
-    DPMSolverMultistepScheduler,
-    EulerAncestralDiscreteScheduler,
-    EulerDiscreteScheduler,
-)
+from diffusers.schedulers import DDIMScheduler, DPMSolverMultistepScheduler
 
 # custom
 from transformers import CLIPTextModel, CLIPTokenizer
@@ -50,10 +45,10 @@ class SDPipelineManager:
 
         print(f"Loading {mode} Stable Diffusion pipeline...")
 
-        if DATASET == "imagenet":
-            self.optimization = True
-        else:
+        if DATASET == "mnist":
             self.optimization = False
+        else:
+            self.optimization = True
 
         if mode == "standard":
             self._init_standard()
@@ -87,10 +82,10 @@ class SDPipelineManager:
             self.pipe = TgateSDDeepCacheLoader(self.pipe, cache_interval=3, cache_branch_id=0).to(DEVICE)
 
         # Configuring scheduler
-        self.pipe.scheduler = DDIMScheduler.from_config(self.pipe.scheduler.config, rescale_betas_zero_snr=True)
-
-        # TODO: test with times
-        # self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config)
+        # print(self.pipe.scheduler.config)
+        self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+            self.pipe.scheduler.config, solver_order=2, timestep_spacing="trailing"
+        )
 
     # ------------------------------------------------------
     #   CUSTOM IMPLEMENTATION
@@ -130,23 +125,9 @@ class SDPipelineManager:
         )
 
         # Load scheduler
-        self.scheduler = DDIMScheduler.from_pretrained(
-            MODEL_ID_PATH, subfolder="scheduler", rescale_betas_zero_snr=False, timestep_spacing="leading"
+        self.scheduler = DPMSolverMultistepScheduler.from_pretrained(
+            MODEL_ID_PATH, subfolder="scheduler", solver_order=2, timestep_spacing="trailing"
         )
-        # Possible alternative schedulers (while testing these gave less noisy images)
-        """
-        self.scheduler = EulerAncestralDiscreteScheduler.from_pretrained(
-            MODEL_ID_PATH, 
-            subfolder="scheduler", 
-            timestep_spacing="leading" 
-        )
-        
-        self.scheduler = EulerDiscreteScheduler.from_pretrained(
-            MODEL_ID_PATH, 
-            subfolder="scheduler",
-            timestep_spacing="leading" 
-        )
-        """
 
     def text_embeddings(self, prompts):
         if isinstance(prompts, str):
