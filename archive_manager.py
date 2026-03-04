@@ -24,7 +24,7 @@ class Archive:
         self.archived_labels = set()
         self.target_size = TARGET_SIZE
         self.distance_input = {
-            "latent_euclidean": "members_distance",
+            "latent_euclidean": "members_latent_euc_dist",
             "image_euclidean": "members_img_euc_dist",
             "latent_cosine": "members_latent_cos_sim",
         }[DISTANCE_METRIC]

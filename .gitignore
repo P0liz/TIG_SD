@@ -213,3 +213,5 @@ diversity_analysis_results/
 runs_*/
 diversity_analysis_results_*/
 VM_instructions.txt
+data/
+threshold_analysis/

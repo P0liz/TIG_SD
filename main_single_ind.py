@@ -123,8 +123,8 @@ def main(prompt, expected_label, max_steps=NGEN):
     images2 = [member2.image_tensor]
     euc_img_dists = []
     euc_img_dists.append(0)
-    euc_dists = []
-    euc_dists.append(0)
+    euc_latent_dists = []
+    euc_latent_dists.append(0)
     latent_cos_sims = []
     latent_cos_sims.append(0)
 
@@ -146,8 +146,8 @@ def main(prompt, expected_label, max_steps=NGEN):
 
         cos_sim = utils.get_distance(selected_digit, other_digit, "latent_cosine")
         latent_cos_sims.append(cos_sim)
-        euc_dist = utils.get_distance(selected_digit, other_digit, "latent_euclidean")
-        euc_dists.append(euc_dist)
+        euc_latent_dist = utils.get_distance(selected_digit, other_digit, "latent_euclidean")
+        euc_latent_dists.append(euc_latent_dist)
         img_euc_dist = utils.get_distance(selected_digit, other_digit, "image_euclidean")
         euc_img_dists.append(img_euc_dist)
 
@@ -159,7 +159,7 @@ def main(prompt, expected_label, max_steps=NGEN):
             f"pred={selected_digit.predicted_label} "
             f"conf={selected_digit.confidence:.3f} "
             f"cos_sim={cos_sim:.3f} "
-            f"euc_dist={euc_dist:.3f} "
+            f"euc_latent_dist={euc_latent_dist:.3f} "
             f"euc_img_dist={img_euc_dist:.3f} "
             f"time={elapsed_seconds}s"
         )
@@ -181,14 +181,14 @@ def main(prompt, expected_label, max_steps=NGEN):
     ind = Individual(member1, member2, prompt, None)  # Create final individual to see results
     ind.misstep = step
     ind.bad_prediction = selected_digit.predicted_label
-    ind.members_distance = euc_dist
+    ind.members_latent_euc_dist = euc_latent_dist
     ind.members_img_euc_dist = img_euc_dist
     ind.members_latent_cos_sim = cos_sim
     ind.export()
     base_path = f"{Folder.DST}"
     export_as_gif(f"{base_path}/individual_{Folder.run_id}_1.gif", images1, rubber_band=True)
     export_as_gif(f"{base_path}/individual_{Folder.run_id}_2.gif", images2, rubber_band=True)
-    plot_distance(euc_dists, f"{base_path}/euclidean_distance_{Folder.run_id}.png", "Euclidean distance")
+    plot_distance(euc_latent_dists, f"{base_path}/euclidean_latent_distance_{Folder.run_id}.png", "Euclidean distance")
     plot_distance(latent_cos_sims, f"{base_path}/cosine_similarity_{Folder.run_id}.png", "Cosine similarity")
     plot_distance(
         euc_img_dists, f"{base_path}/euclidean_image_distance_{Folder.run_id}.png", "Euclidean image distance"

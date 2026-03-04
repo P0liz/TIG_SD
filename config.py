@@ -9,6 +9,7 @@ SHORT_GEN = True
 
 # Dataset
 DATASET = "mnist"  # Or "imagenet"
+DISTANCE_METRIC = "image_euclidean"  # Or 'latent_euclidean' Or 'latent_cosine'
 
 # Popolazione e generazioni
 if SHORT_GEN:
@@ -28,10 +29,10 @@ REPORT_NAME = "stats.csv"
 STOP_CONDITION = "iter"  # Or 'time'
 TARGET_SIZE = 30  # Ideal number of archived individuals
 MAX_BUCKET_SIZE = 3
-BUCKET_CONFIG = "size"  # Or "dist"
+BUCKET_CONFIG = "dist"  # Or "dist"
 # Minimum distance between two individuals to be considered different enough (the higher the less inds archived)
 # ATTENTION: this changes with the chosen metric
-DIST_THRESHOLD = 20  # img_euc: 8 # lat_cos: 0.5 # lat_euc: 20
+DIST_THRESHOLD = 9.791  # img_euc: 9.791 # lat_cos: 0.5 # lat_euc: 181
 
 # Timer
 RUNTIME = 3600
@@ -64,9 +65,7 @@ elif DATASET == "imagenet":
     NUM_INFERENCE_STEPS = 25
 DELTA = 0.025  # affects perturbation size for mutation
 STANDING_STEP_LIMIT = 2
-DISTANCE_METRIC = "latent_euclidean"  # Or 'image_euclidean' Or 'latent_cosine'
-# ATTENTION: this changes with the chosen metric
-CONF_CHANGE = 1.0  # img_euc: 0.5 # lat_cos: 0.02 # lat_euc: 1.0
+CONF_CHANGE = 1.0
 
 # Torch settings
 if torch.cuda.is_available():

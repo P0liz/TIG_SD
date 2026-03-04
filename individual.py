@@ -24,8 +24,8 @@ class Individual:
         self.id = Individual.COUNT
         self.prompt = prompt
         self.original_noise = latent
-        self.members_distance = 0
-        self.members_distances = [0]
+        self.members_latent_euc_dist = 0
+        self.members_latent_euc_dists = [0]
         self.members_img_euc_dist = 0
         self.members_img_euc_dists = [0]
         self.members_latent_cos_sim = 0
@@ -59,7 +59,7 @@ class Individual:
                 "predicted_label": str(self.m2.predicted_label),
                 "confidence": str(self.m2.confidence),
             },
-            "members_distance": str(self.members_distance),
+            "members_latent_distance": str(self.members_latent_euc_dist),
             "members_img_euc_dist": str(self.members_img_euc_dist),
             "members_latent_cos_sim": str(self.members_latent_cos_sim),
             "aggregate_ff": str(self.aggregate_ff),
@@ -88,12 +88,12 @@ class Individual:
             latent_path = join(ind_dir, f"m{idx}_latent.npy")
             image_path = join(ind_dir, f"m{idx}_image.npy")
 
-            lat_np = member.latent.detach().cpu().numpy().squeeze()
+            lat_np = member.latent.detach().cpu().numpy()
 
             # Save image (visual)
             if DATASET == "mnist":
                 # Rememeber to save image from the preprocessed tensor (already 28x28 grayscale)
-                img_np = member.image_tensor.detach().cpu().numpy().squeeze()
+                img_np = member.image_tensor.detach().cpu().numpy()
                 plt.imsave(png_path, img_np, cmap=cm.gray, format="png", vmin=0, vmax=1)
             elif DATASET == "imagenet":
                 img_np = save_imagenet_image_np(member, png_path)
@@ -116,10 +116,10 @@ class Individual:
         save_member(self.m2, idx=2)
 
         # Plotting distances
-        dist_path = join(ind_dir, "members_distance.png")
+        dist_path = join(ind_dir, "members_latent_euc_dist.png")
         dist_img_path = join(ind_dir, "members_img_euc_dist.png")
         cos_sim_path = join(ind_dir, "members_latent_cos_sim.png")
-        plot_distance(self.members_distances, dist_path, "Members Latent Euclidean Distance")
+        plot_distance(self.members_latent_euc_dists, dist_path, "Members Latent Euclidean Distance")
         plot_distance(self.members_img_euc_dists, dist_img_path, "Members Image Euclidean Distance")
         plot_distance(self.members_latent_cos_sims, cos_sim_path, "Members Latent Cosine Similarity")
 
@@ -137,7 +137,7 @@ class Individual:
 
         # Get the appropriate distance based on config
         distance_attr = {
-            "latent_euclidean": "members_distance",
+            "latent_euclidean": "members_latent_euc_dist",
             "image_euclidean": "members_img_euc_dist",
             "latent_cosine": "members_latent_cos_sim",
         }[DISTANCE_METRIC]

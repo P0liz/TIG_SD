@@ -158,7 +158,7 @@ class GeneticAlgorithm:
 
         for i, ind in enumerate(individuals):
             # Update distances
-            ind.members_distance = utils.get_distance(members_to_mutate[i], other_members[i], "latent_euclidean")
+            ind.members_latent_euc_dist = utils.get_distance(members_to_mutate[i], other_members[i], "latent_euclidean")
             ind.members_img_euc_dist = utils.get_distance(members_to_mutate[i], other_members[i], "image_euclidean")
             ind.members_latent_cos_sim = utils.get_distance(members_to_mutate[i], other_members[i], "latent_cosine")
             # reset fitness-related fields
@@ -239,12 +239,12 @@ class GeneticAlgorithm:
         new_ind: Individual = creator.Individual(
             individual.m1.clone(), individual.m2.clone(), individual.prompt, individual.original_noise.clone()
         )
-        new_ind.members_distance = individual.members_distance
+        new_ind.members_latent_euc_dist = individual.members_latent_euc_dist
         new_ind.members_img_euc_dist = individual.members_img_euc_dist
         new_ind.members_latent_cos_sim = individual.members_latent_cos_sim
         new_ind.prompt = individual.prompt
         # for plotting
-        new_ind.members_distances = list(individual.members_distances)
+        new_ind.members_latent_euc_dists = list(individual.members_latent_euc_dists)
         new_ind.members_img_euc_dists = list(individual.members_img_euc_dists)
         new_ind.members_latent_cos_sims = list(individual.members_latent_cos_sims)
         return new_ind
@@ -327,7 +327,7 @@ class GeneticAlgorithm:
         for ind in individuals:
             ind.m1.confidence_history.append(ind.m1.confidence)
             ind.m2.confidence_history.append(ind.m2.confidence)
-            ind.members_distances.append(ind.members_distance)
+            ind.members_latent_euc_dists.append(ind.members_latent_euc_dist)
             ind.members_img_euc_dists.append(ind.members_img_euc_dist)
             ind.members_latent_cos_sims.append(ind.members_latent_cos_sim)
 
