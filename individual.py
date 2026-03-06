@@ -86,14 +86,15 @@ class Individual:
             png_path = join(ind_dir, base_name + ".png")
             conf_path = join(ind_dir, base_name + "_conf.png")
             latent_path = join(ind_dir, f"m{idx}_latent.npy")
+            denoised_latent_path = join(ind_dir, f"m{idx}_denoised_latent.npy")
             image_path = join(ind_dir, f"m{idx}_image.npy")
 
             lat_np = member.latent.detach().cpu().numpy()
+            denoised_lat_np = member.denoised_latent.detach().cpu().numpy()
 
             # Save image (visual)
             if DATASET == "mnist":
-                # Rememeber to save image from the preprocessed tensor (already 28x28 grayscale)
-                img_np = member.image_tensor.detach().cpu().numpy()
+                img_np = member.image_tensor.squeeze().detach().cpu().numpy()
                 plt.imsave(png_path, img_np, cmap=cm.gray, format="png", vmin=0, vmax=1)
             elif DATASET == "imagenet":
                 img_np = save_imagenet_image_np(member, png_path)
@@ -103,6 +104,7 @@ class Individual:
 
             # Save latent and image as .npy files (raw tensors)
             np.save(latent_path, lat_np)
+            np.save(denoised_latent_path, denoised_lat_np)
             np.save(image_path, img_np)
 
             # Save confidence plot
@@ -171,9 +173,10 @@ class Individual:
 
 
 def save_imagenet_image_np(member, png_path):
-    img = member.image_tensor.detach().cpu()
+    img = member.image_tensor.squeeze().detach().cpu()
     # Rimuovi batch se presente
     if img.ndim == 4:
+        print(f"Warning: Saving only the first image of batch with shape: {img.shape}")
         img = img[0]
     # Se formato CHW → converti a HWC
     if img.shape[0] == 3:

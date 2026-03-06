@@ -18,6 +18,8 @@ from config import *
 pipeline_manager.initialize("standard")
 pipe = pipeline_manager.pipe
 
+RUNS = 5
+
 # DEAP framework setup.
 # Maximize aggregate_ff, minimize misclass
 creator.create("FitnessMulti", base.Fitness, weights=(1.0, -1.0))
@@ -70,16 +72,11 @@ class GeneticAlgorithm:
         print(f"Failed to generate valid member for label {expected_label}")
         return None
 
-    def create_individual(self, label=None):
-        if label is None:
-            label = random.randint(0, 9)
-
-        # Override label if specified in config
-        if DATASET == "mnist":
-            prompt = PROMPTS[label]
-        elif DATASET == "imagenet":
-            label = IMAGENET_LABEL
-            prompt = PROMPTS[0]
+    def create_individual(self, idx=None):
+        if idx is None:
+            idx = random.randint(0, 9)
+        prompt = PROMPTS[idx]
+        label = LABELS[idx]
 
         # Generate members
         m1 = self.generate_member(prompt, label)
@@ -249,7 +246,6 @@ class GeneticAlgorithm:
         new_ind.members_latent_cos_sims = list(individual.members_latent_cos_sims)
         return new_ind
 
-    # TODO: understand reseeding for imagenet, is it needed?
     def reseed_population(self, population, n_reseed):
         """
         Reseed n_reseed individuals in the population to promote diversity
@@ -259,7 +255,7 @@ class GeneticAlgorithm:
             return population
 
         # Find labels which are not in the archive
-        all_labels = set(range(10))
+        all_labels = LABELS
         unused_labels = all_labels - self.archive.archived_labels
 
         # Substitute the last n_reseed (worst after selection)
@@ -376,7 +372,7 @@ class GeneticAlgorithm:
             offspring = [self.clone_individual(ind) for ind in offspring]
 
             # 2. Reseeding
-            if len(self.archive.get_archive()) > 0 and gen % RESEED_INTERVAL == 0 and DATASET == "mnist":
+            if len(self.archive.get_archive()) > 0 and gen % RESEED_INTERVAL == 0:
                 n_reseed = random.randint(1, RESEEDUPPERBOUND)
                 population = self.reseed_population(population, n_reseed)
 
@@ -438,7 +434,7 @@ if __name__ == "__main__":
     from utils import print_archive_experiment
     import config
 
-    for i in range(0, 5):
+    for i in range(0, RUNS):
         Folder.initialize(method=config.ARCHIVE_TYPE)
         Timer.initialize()
 

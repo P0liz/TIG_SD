@@ -75,6 +75,13 @@ def apply_mutation_op1(org_latent, device=DEVICE):
 def generate(prompts, mutated_latents, guidance_scale=2.5, generator=None):
     # Using batch generation to speed up the process, since the pipeline can handle multiple latents at once
     pipe = pipeline_manager.pipe
+    captured = {}
+
+    # Callback to capture denoised latents at the last step
+    def capture_latents(pipe, step, timestep, callback_kwargs):
+        if step == pipeline_manager.num_inference_steps - 1:
+            captured["latents"] = callback_kwargs["latents"].clone()
+        return callback_kwargs
 
     with torch.inference_mode():
         if pipeline_manager.optimization:
@@ -85,6 +92,8 @@ def generate(prompts, mutated_latents, guidance_scale=2.5, generator=None):
                 num_inference_steps=pipeline_manager.num_inference_steps,
                 latents=mutated_latents,
                 generator=generator,
+                callback_on_step_end=capture_latents,
+                callback_on_step_end_tensor_inputs=["latents"],
             )["images"]
         else:
             images = pipe(
@@ -93,8 +102,11 @@ def generate(prompts, mutated_latents, guidance_scale=2.5, generator=None):
                 num_inference_steps=pipeline_manager.num_inference_steps,
                 latents=mutated_latents,
                 generator=generator,
+                callback_on_step_end=capture_latents,
+                callback_on_step_end_tensor_inputs=["latents"],
             )["images"]
     torch.cuda.empty_cache()
+    denoised_latents = captured["latents"]
 
     image_tensors = []
     if DATASET == "mnist":
@@ -107,7 +119,7 @@ def generate(prompts, mutated_latents, guidance_scale=2.5, generator=None):
             image_tensors.append(transform(image).to(DEVICE))
     else:
         raise ValueError("Unsupported dataset specified in config")
-    return image_tensors, images
+    return image_tensors, images, denoised_latents
 
 
 def process_mnist_image(image):

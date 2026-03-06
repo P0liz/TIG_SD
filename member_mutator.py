@@ -115,9 +115,12 @@ class MemberMutator:
         assert pipeline_manager._mode == "standard", "generate() only works in standard mode"
 
         batch_latents = torch.cat([member.latent for member in self.members])
-        mutated_tensors, images = mutation_manager.generate(self.prompts, batch_latents, guidance_scale, generator)
+        mutated_tensors, images, denoised_latents = mutation_manager.generate(
+            self.prompts, batch_latents, guidance_scale, generator
+        )
         # Update state
         for i, member in enumerate(self.members):
+            member.denoised_latent = denoised_latents[i]
             member.image_tensor = mutated_tensors[i]
             member.image = images[i]
 

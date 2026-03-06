@@ -203,15 +203,11 @@ if __name__ == "__main__":
         Folder.initialize()
         Timer.initialize()
         random.seed(SEED)
-        randprompt = random.choice(PROMPTS)
-        if DATASET == "mnist":
-            expected_label = int(re.search(r"Number(\d+)", randprompt).group(1))
-        elif DATASET == "imagenet":
-            expected_label = IMAGENET_LABEL
-        else:
-            raise ValueError("Unsupported dataset specified in config")
+        random_idx = random.randint(0, 9)
+        prompt = PROMPTS[random_idx]
+        label = LABELS[random_idx]
 
-        main(prompt=randprompt, expected_label=expected_label)
+        main(prompt=prompt, expected_label=label)
         print("GAME OVER")
         config.TRYNEW = not config.TRYNEW
 

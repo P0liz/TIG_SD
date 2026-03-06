@@ -9,7 +9,7 @@ SHORT_GEN = True
 
 # Dataset
 DATASET = "mnist"  # Or "imagenet"
-DISTANCE_METRIC = "image_euclidean"  # Or 'latent_euclidean' Or 'latent_cosine'
+DISTANCE_METRIC = "latent_euclidean"  # Or 'latent_cosine' or "image_euclidean"
 
 # Popolazione e generazioni
 if SHORT_GEN:
@@ -32,7 +32,7 @@ MAX_BUCKET_SIZE = 3
 BUCKET_CONFIG = "dist"  # Or "dist"
 # Minimum distance between two individuals to be considered different enough (the higher the less inds archived)
 # ATTENTION: this changes with the chosen metric
-DIST_THRESHOLD = 9.791  # img_euc: 9.791 # lat_cos: 0.5 # lat_euc: 181
+DIST_THRESHOLD = 77.126 / 2  # img_euc: 9.791 # lat_cos: 0.5 # lat_euc: 77.126
 
 # Timer
 RUNTIME = 3600
@@ -90,10 +90,23 @@ if DATASET == "mnist":
         "A photo of Eight8 Number8",
         "A photo of Nine9 Number9",
     ]
+    LABELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 elif DATASET == "imagenet":
-    # PROMPTS = ["A photo of 1pizza pizza_slice"]
-    PROMPTS = ["A photo of 1pizza"]
-    IMAGENET_LABEL = 963  # OR change 850 for teddy class
+    # PROMPTS = ["A photo of 1pizza"]
+    # LABELS = [963] # OR change 850 for teddy class
+    PROMPTS = [
+        "A real photo of a goldfish",
+        "A real photo of a bullfrog",
+        "A real photo of an albatross",
+        "A real photo of a tiger",
+        "A real photo of a giant panda",
+        "A real photo of a basketball",
+        "A real photo of a dining table",
+        "A real photo of a parachute",
+        "A real photo of a teapot",
+        "A real photo of a pizza",
+    ]
+    LABELS = [1, 30, 146, 292, 388, 430, 532, 701, 849, 963]
 
 # Diversity analysis
 ANALYSIS_CONFIG = "single_run"  # Or "archives"

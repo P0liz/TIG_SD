@@ -74,8 +74,9 @@ class SDPipelineManager:
             MODEL_ID_PATH, variant=VARIANT, torch_dtype=DTYPE, safety_checker=None
         ).to(DEVICE)
 
-        # Load LoRA weights
-        self.pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
+        if DATASET == "mnist":
+            # Load LoRA weights to use fine tuned model
+            self.pipe.load_lora_weights(LORA_PATH, weight_name=LORA_WEIGHTS)
 
         # Inference speed optimization
         if self.optimization:

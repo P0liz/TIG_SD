@@ -39,7 +39,6 @@ class Archive:
             bucket = [arc_ind for arc_ind in self.archive if arc_ind.m1.expected_label == ind.m1.expected_label]
             if len(bucket) == 0:
                 self.archive.append(ind)
-                self.archived_labels.add(ind.m1.expected_label)
                 self.print_helper(ind, "first added")
             else:
                 # Find the member of the archive that is closest to the candidate.
@@ -59,7 +58,6 @@ class Archive:
                         if BUCKET_CONFIG == "size":
                             # Fill bucket until max bucket size is reached
                             self.archive.append(ind)
-                            self.archived_labels.add(ind.m1.expected_label)
                             self.print_helper(ind, "newly added")
                         elif BUCKET_CONFIG == "dist":
                             # HARD ENTER
@@ -78,17 +76,14 @@ class Archive:
                                 if members_dist_ind <= members_dist_archived_ind:
                                     self.archive.remove(closest)
                                     self.print_helper(closest, "removed")
-                                    self.archived_labels.remove(closest.m1.expected_label)
                                     self.archive.append(ind)
                                     self.print_helper(ind, "added")
-                                    self.archived_labels.add(ind.m1.expected_label)
                                 else:
                                     self.print_helper(ind, "not added")
                             else:
                                 # Add the candidate to the archive if it is distant from all the other archive individuals
                                 self.print_helper(ind, "newly added")
                                 self.archive.append(ind)
-                                self.archived_labels.add(ind.m1.expected_label)
                         else:
                             raise ValueError(f"Invalid bucket configuration: {BUCKET_CONFIG}")
                     # when bucket is full >>> local competition between new and worst
@@ -98,10 +93,9 @@ class Archive:
                         if getattr(ind, self.distance_input) < getattr(tshd, self.distance_input):
                             self.archive.remove(tshd)
                             self.print_helper(tshd, "removed")
-                            self.archived_labels.remove(tshd.m1.expected_label)
                             self.archive.append(ind)
                             self.print_helper(ind, "added")
-                            self.archived_labels.add(ind.m1.expected_label)
+            self.archived_labels = {a.m1.expected_label for a in self.archive}
 
     def update_size_based_archive(self, ind: "Individual"):
         if ind not in self.archive:
@@ -109,7 +103,6 @@ class Archive:
             if len(self.archive) == 0:
                 self.print_helper(ind, "first added")
                 self.archive.append(ind)
-                self.archived_labels.add(ind.m1.expected_label)
             else:
                 # Find the member of the archive that is closest to the candidate.
                 d_min, c = evaluate_sparseness(ind, self.archive)
@@ -119,8 +112,6 @@ class Archive:
                     if d_min > 0:
                         self.print_helper(ind, "newly added")
                         self.archive.append(ind)
-                        self.archived_labels.add(ind.m1.expected_label)
-
                 # archive is full
                 else:
                     # Diversity bonus
@@ -136,38 +127,32 @@ class Archive:
                     if getattr(c, self.distance_input) > ind_score:
                         self.archive.remove(c)
                         self.print_helper(c, "removed")
-                        self.archived_labels.remove(c.m1.expected_label)
                         self.archive.append(ind)
                         self.print_helper(ind, "added")
-                        self.archived_labels.add(ind.m1.expected_label)
                     # TODO: review because the cases below are almost never reached
                     elif getattr(c, self.distance_input) == getattr(ind, self.distance_input):
                         # ind has better performance
                         if ind.misclass < c.misclass:
                             self.archive.remove(c)
                             self.print_helper(c, "removed")
-                            self.archived_labels.remove(c.m1.expected_label)
                             self.archive.append(ind)
                             self.print_helper(ind, "added")
-                            self.archived_labels.add(ind.m1.expected_label)
                         # c and ind have the same performance
                         elif ind.misclass == c.misclass:
                             # ind has better sparseness
                             if d_min > c.sparseness:
                                 self.archive.remove(c)
                                 self.print_helper(c, "removed")
-                                self.archived_labels.remove(c.m1.expected_label)
                                 self.archive.append(ind)
                                 self.print_helper(ind, "added")
-                                self.archived_labels.add(ind.m1.expected_label)
                     else:
                         self.print_helper(ind, "not added")
+            self.archived_labels = {a.m1.expected_label for a in self.archive}
 
     def update_dist_based_archive(self, ind: "Individual"):
         if ind not in self.archive:
             if len(self.archive) == 0:
                 self.archive.append(ind)
-                self.archived_labels.add(ind.m1.expected_label)
                 self.print_helper(ind, "first added")
             else:
                 # Find the individual of the archive that is closest to the candidate.
@@ -196,17 +181,15 @@ class Archive:
                     if members_dist_ind <= members_dist_archived_ind:
                         self.archive.remove(closest_archived)
                         self.print_helper(closest_archived, "removed")
-                        self.archived_labels.remove(closest_archived.m1.expected_label)
                         self.archive.append(ind)
                         self.print_helper(ind, "added")
-                        self.archived_labels.add(ind.m1.expected_label)
                     else:
                         self.print_helper(ind, "not added")
                 else:
                     # Add the candidate to the archive if it is distant from all the other archive individuals
                     self.print_helper(ind, "newly added")
                     self.archive.append(ind)
-                    self.archived_labels.add(ind.m1.expected_label)
+            self.archived_labels = {a.m1.expected_label for a in self.archive}
 
     def create_report(self, labels, generation, logbook=None, labels_history=None):
         # Retrieve the solutions belonging to the archive.
@@ -214,21 +197,17 @@ class Archive:
             dst = join(Folder.DST, REPORT_NAME)
             with open(dst, mode="w") as report_file:
                 report_writer = csv.writer(report_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
-                # TODO: add stuff
                 report_writer.writerow(
                     [
                         "run",
                         "iteration",
                         "archive_len",
-                        "total_labels",
+                        "explored_labels",
                         "covered_labels",
-                        "final_labels",
                         "members_dist_min",
                         "members_dist_max",
                         "members_dist_avg",
                         "members_dist_std",
-                        # "radius_ref_out",
-                        # "radius_ref_in",
                         "diameter_out",
                         "diameter_in",
                         "elapsed_time",
@@ -251,24 +230,13 @@ class Archive:
             outer_frontier.append(misclassified_member)
             inner_frontier.append(correct_member)
 
-        out_radius = None
-        in_radius = None
-        out_radius_ref = None
-        in_radius_ref = None
         out_diameter = None
         in_diameter = None
         stats = [None] * 4
-        final_labels = []
         if len(solution) > 0:
-            # reference_filename = "ref_digit/cinque_rp.npy"
-            # reference = np.load(reference_filename)
             out_diameter = get_diameter(outer_frontier)
             in_diameter = get_diameter(inner_frontier)
-            final_labels = self.get_labels()
             stats = self.get_dist_members()
-            # TODO: what for?
-            # out_radius_ref = get_radius_reference(outer_frontier, reference)
-            # in_radius_ref = get_radius_reference(inner_frontier, reference)
 
         if STOP_CONDITION == "iter":
             budget = NGEN
@@ -318,15 +286,10 @@ class Archive:
                     str(n),
                     str(len(labels)),
                     str(len(self.archived_labels)),
-                    str(len(final_labels)),
                     str(stats[0]),
                     str(stats[1]),
                     str(stats[2]),
                     str(stats[3]),
-                    # str(out_radius_ref),
-                    # str(in_radius_ref),
-                    # str(out_radius),
-                    # str(in_radius),
                     str(out_diameter),
                     str(in_diameter),
                     str(elapsed_time),
@@ -383,12 +346,6 @@ class Archive:
         if labels_history is not None:
             dst = join(Folder.DST, "labels_history.png")
             plot_labels(labels_history, dst)
-
-    def get_labels(self):
-        labels = set()
-        for ind in self.get_archive():
-            labels.add(ind.m1.expected_label)
-        return labels
 
     def get_dist_members(self):
         distances = list()

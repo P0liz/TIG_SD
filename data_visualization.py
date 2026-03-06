@@ -3,6 +3,8 @@ from PIL import Image
 import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from mpl_toolkits.mplot3d import Axes3D
 from venn import venn
 
 from config import PROMPTS, ANALYSIS_CONFIG, DIVERSITY_OUTPUT_FOLDER, FOCUS_NAME, OTHERS_NAME
@@ -128,6 +130,190 @@ def plot_distance(distances, save_path, title):
     plt.savefig(save_path)
     plt.close(fig)
     print(f"Plot saved to {save_path}")
+
+
+def plot_tsne_3d(
+    tsne_results,
+    labels_method,
+    cluster_labels,
+    medoid_indices,
+    method_names,
+    coverage_dict_weighted,
+    num_clusters,
+    idx=0,
+):
+    # 2. Crea plot 3D
+    fig = plt.figure(figsize=(14, 10))
+    ax = fig.add_subplot(111, projection="3d")
+
+    # Genera colori per cluster
+    max_cluster_id = cluster_labels.max()
+    cluster_colors = cm.rainbow(np.linspace(0, 1, max_cluster_id + 1))
+
+    # Marker per metodo (stesso codice)
+    if ANALYSIS_CONFIG == "single_run":
+        method_markers = {FOCUS_NAME: "v", OTHERS_NAME: "o"}
+    elif ANALYSIS_CONFIG == "archives":
+        method_markers = {
+            "archive_size": "s",
+            "archive_dist": "d",
+            "archive_bucket_size": "^",
+            "archive_bucket_dist": "o",
+        }
+
+    # 3. Plot medoids in 3D
+    medoids_tsne = tsne_results[medoid_indices]
+    ax.scatter(
+        medoids_tsne[:, 0],
+        medoids_tsne[:, 1],
+        medoids_tsne[:, 2],  # Aggiungi coordinata Z
+        c=cluster_colors,
+        marker="x",
+        s=150,
+        alpha=0.6,
+        linewidths=4,
+        label="Medoids",
+    )
+
+    # 4. Plot punti in 3D
+    plotted_methods = set()
+    for cluster_id in range(num_clusters):
+        cluster_mask = cluster_labels == cluster_id
+        cluster_color = cluster_colors[cluster_id]
+
+        for method in method_names:
+            method_and_cluster_mask = [
+                cluster_mask[i] and labels_method[i] == method for i in range(len(labels_method))
+            ]
+
+            if any(method_and_cluster_mask):
+                label = f"{method} ({coverage_dict_weighted[method]:.1f}%)" if method not in plotted_methods else None
+                if label:
+                    plotted_methods.add(method)
+
+                size = 400 if ANALYSIS_CONFIG == "single_run" and method == "focus" else 80
+
+                ax.scatter(
+                    tsne_results[method_and_cluster_mask, 0],
+                    tsne_results[method_and_cluster_mask, 1],
+                    tsne_results[method_and_cluster_mask, 2],  # Aggiungi Z
+                    c=[cluster_color],
+                    marker=method_markers[method],
+                    s=size,
+                    label=label,
+                )
+
+    # 5. Configura assi 3D
+    ax.legend()
+    ax.set_xlabel("t-SNE dimension 1")
+    ax.set_ylabel("t-SNE dimension 2")
+    ax.set_zlabel("t-SNE dimension 3")  # Aggiungi label Z
+
+    if ANALYSIS_CONFIG == "single_run":
+        ax.set_title(f"Single Run Diversity Comparison (t-SNE 3D) Total clusters: {num_clusters}")
+    else:
+        ax.set_title(f"Archive Diversity Comparison (t-SNE 3D) Total clusters: {num_clusters}")
+
+    plt.tight_layout()
+    plt.savefig(f"{DIVERSITY_OUTPUT_FOLDER}/diversity_comparison_{idx}.pdf")
+
+
+def plot_tsne_3d_interactive(
+    tsne_results,
+    labels_method,
+    cluster_labels,
+    medoid_indices,
+    method_names,
+    coverage_dict_weighted,
+    num_clusters,
+    idx=0,
+):
+    """Plot interattivo 3D con Plotly"""
+
+    fig = go.Figure()
+
+    # Colori per cluster (converti matplotlib colors in hex)
+    cluster_colors_rgb = cm.rainbow(np.linspace(0, 1, num_clusters))
+    cluster_colors_hex = [
+        "#%02x%02x%02x" % (int(r * 255), int(g * 255), int(b * 255)) for r, g, b, _ in cluster_colors_rgb
+    ]
+
+    # Marker symbols per metodo
+    if ANALYSIS_CONFIG == "single_run":
+        method_symbols = {FOCUS_NAME: "diamond", OTHERS_NAME: "circle"}
+    elif ANALYSIS_CONFIG == "archives":
+        method_symbols = {
+            "archive_size": "square",
+            "archive_dist": "diamond",
+            "archive_bucket_size": "cross",
+            "archive_bucket_dist": "circle",
+        }
+
+    # Plot medoids
+    medoids_tsne = tsne_results[medoid_indices]
+    fig.add_trace(
+        go.Scatter3d(
+            x=medoids_tsne[:, 0],
+            y=medoids_tsne[:, 1],
+            z=medoids_tsne[:, 2],
+            mode="markers",
+            name="Medoids",
+            marker=dict(size=10, color=cluster_colors_hex, symbol="x", line=dict(width=2, color="black")),
+            showlegend=True,
+        )
+    )
+
+    # Plot punti per metodo e cluster
+    for method in method_names:
+        method_indices = [i for i, m in enumerate(labels_method) if m == method]
+
+        if not method_indices:
+            continue
+
+        # Raggruppa per cluster per avere colori diversi
+        for cluster_id in range(num_clusters):
+            cluster_mask = cluster_labels == cluster_id
+            method_cluster_indices = [i for i in method_indices if cluster_mask[i]]
+
+            if not method_cluster_indices:
+                continue
+
+            # Size maggiore per focus
+            size = 12 if ANALYSIS_CONFIG == "single_run" and method == FOCUS_NAME else 6
+
+            fig.add_trace(
+                go.Scatter3d(
+                    x=tsne_results[method_cluster_indices, 0],
+                    y=tsne_results[method_cluster_indices, 1],
+                    z=tsne_results[method_cluster_indices, 2],
+                    mode="markers",
+                    name=f"{method} - C{cluster_id}",
+                    legendgroup=method,
+                    marker=dict(
+                        size=size,
+                        color=cluster_colors_hex[cluster_id],
+                        symbol=method_symbols[method],
+                        line=dict(width=0.5, color="black"),
+                    ),
+                    showlegend=(cluster_id == 0),  # Solo prima occorrenza in legend
+                )
+            )
+
+    # Layout
+    title = f"{'Single Run' if ANALYSIS_CONFIG == 'single_run' else 'Archive'} Diversity (t-SNE 3D) - {num_clusters} clusters"
+
+    fig.update_layout(
+        title=title,
+        scene=dict(xaxis_title="t-SNE dimension 1", yaxis_title="t-SNE dimension 2", zaxis_title="t-SNE dimension 3"),
+        width=1200,
+        height=900,
+        showlegend=True,
+        legend=dict(x=0.02, y=0.98),
+    )
+
+    # Salva
+    fig.write_html(f"{DIVERSITY_OUTPUT_FOLDER}/diversity_3d_{idx}.html")
+    print(f"Saved interactive 3D plot to diversity_3d_{idx}.html")
 
 
 # Chiama la nuova funzione per il plot con expected labels

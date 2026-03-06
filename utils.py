@@ -8,14 +8,14 @@ def get_distance(m1, m2, metric=None):
     if metric is None:
         metric = DISTANCE_METRIC
     if metric == "latent_cosine":
-        v1 = m1.latent.flatten().unsqueeze(0)
-        v2 = m2.latent.flatten().unsqueeze(0)
+        v1 = m1.denoised_latent.flatten().unsqueeze(0)
+        v2 = m2.denoised_latent.flatten().unsqueeze(0)
         cos_sim = torch.nn.functional.cosine_similarity(v1, v2)
         return (1 - cos_sim).item()  # Convert similarity to distance
     elif metric == "image_euclidean":
         return torch.linalg.norm(m1.image_tensor - m2.image_tensor).item()
     elif metric == "latent_euclidean":
-        return torch.linalg.norm(m1.latent - m2.latent).item()
+        return torch.linalg.norm(m1.denoised_latent - m2.denoised_latent).item()
     else:
         raise ValueError(f"Unknown distance metric: {metric}")
 
